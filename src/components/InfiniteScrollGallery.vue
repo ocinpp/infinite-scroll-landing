@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import ImageModal from "./ImageModal.vue";
 
 interface ImageItem {
@@ -69,6 +69,38 @@ const images: ImageItem[] = [
   },
 ];
 
+// Additional images for variety in different containers
+const additionalImages: ImageItem[] = [
+  {
+    id: 9,
+    url: "https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400",
+    title: "Tropical Paradise",
+    description:
+      "Crystal clear waters and pristine beaches that define the perfect tropical getaway destination.",
+  },
+  {
+    id: 10,
+    url: "https://images.pexels.com/photos/1761279/pexels-photo-1761279.jpeg?auto=compress&cs=tinysrgb&w=400",
+    title: "Urban Skyline",
+    description:
+      "Magnificent city skyline showcasing modern architecture and urban development at its finest.",
+  },
+  {
+    id: 11,
+    url: "https://images.pexels.com/photos/1450353/pexels-photo-1450353.jpeg?auto=compress&cs=tinysrgb&w=400",
+    title: "Autumn Forest",
+    description:
+      "Golden autumn leaves creating a magical carpet through the peaceful forest pathway.",
+  },
+  {
+    id: 12,
+    url: "https://images.pexels.com/photos/1563356/pexels-photo-1563356.jpeg?auto=compress&cs=tinysrgb&w=400",
+    title: "Starry Night",
+    description:
+      "Breathtaking night sky filled with countless stars over a serene landscape.",
+  },
+];
+
 // Reactive state
 const tiltDegree = ref(15);
 const tiltDirection = ref<"left" | "right">("right");
@@ -76,17 +108,20 @@ const autoplay = ref(true);
 const autoplayDirection = ref<"forward" | "reverse">("forward");
 const pauseOnHover = ref(true);
 const scrollSpeed = ref(20);
+const numberOfContainers = ref(3);
+const layerSpacing = ref(1); // NEW: Spacing between layers in rem
 const selectedImage = ref<ImageItem | null>(null);
 const isModalOpen = ref(false);
 const isPaused = ref(false);
 const showControls = ref(false);
 
-// Infinite scroll state
-const scrollContainer = ref<HTMLElement>();
+// Fixed number of containers - always create 5, show/hide based on numberOfContainers
+const MAX_CONTAINERS = 5;
+const scrollContainers = ref<HTMLElement[]>(Array(MAX_CONTAINERS).fill(null));
 const animationId = ref<number>();
-const scrollPosition = ref(0);
+const scrollPositions = ref<number[]>(Array(MAX_CONTAINERS).fill(0));
 
-// Computed properties - Apply tilt to the entire scrolling container
+// Computed properties
 const containerTiltStyle = computed(() => {
   const degree =
     tiltDirection.value === "left"
@@ -98,10 +133,38 @@ const containerTiltStyle = computed(() => {
   };
 });
 
-// Create enough duplicates for seamless scrolling - we need at least 3 sets
-const duplicatedImages = computed(() => {
-  return [...images, ...images, ...images];
+// Calculate container height to fill the page maximally
+const containerHeight = computed(() => {
+  // Base height that fills the screen divided by number of containers
+  const baseHeight = 100 / numberOfContainers.value; // dvh per container
+
+  // Add extra height based on tilt to ensure full coverage
+  const tiltBonus = Math.abs(tiltDegree.value) * 0.5; // Extra height for tilted containers
+
+  return Math.min(baseHeight + tiltBonus, 95); // Cap at 95dvh to prevent excessive size
 });
+
+// Create different image sets for each container
+const getImagesForContainer = (containerIndex: number) => {
+  const allImages = [...images, ...additionalImages];
+  const startIndex = (containerIndex * 4) % allImages.length;
+  const containerImages = [];
+
+  for (let i = 0; i < 8; i++) {
+    containerImages.push(allImages[(startIndex + i) % allImages.length]);
+  }
+
+  // Triple for seamless scrolling
+  return [...containerImages, ...containerImages, ...containerImages];
+};
+
+// Container registration function
+const registerContainer = (el: HTMLElement | null, index: number) => {
+  if (el && index >= 0 && index < MAX_CONTAINERS) {
+    scrollContainers.value[index] = el;
+    console.log(`✅ Container ${index} registered`);
+  }
+};
 
 // Methods
 const openModal = (image: ImageItem) => {
@@ -130,50 +193,89 @@ const handleMouseLeave = () => {
   }
 };
 
-// True seamless infinite scroll using CSS transforms
+// Seamless infinite scroll animation
 const animate = () => {
-  if (!autoplay.value || isPaused.value || !scrollContainer.value) {
+  if (!autoplay.value || isPaused.value) {
     animationId.value = requestAnimationFrame(animate);
     return;
   }
 
-  // Calculate speed in pixels per frame (assuming 60fps)
-  const pixelsPerSecond = 50; // Base speed
-  const speedMultiplier = scrollSpeed.value / 10; // Higher value = faster speed
-  const actualSpeed = (pixelsPerSecond * speedMultiplier) / 60; // Convert to per-frame
+  const pixelsPerSecond = 50;
+  const speedMultiplier = scrollSpeed.value / 10;
+  const actualSpeed = (pixelsPerSecond * speedMultiplier) / 60;
 
-  const direction = autoplayDirection.value === "forward" ? -1 : 1;
-  scrollPosition.value += actualSpeed * direction;
+  // Only animate visible containers
+  for (let index = 0; index < numberOfContainers.value; index++) {
+    const container = scrollContainers.value[index];
+    if (!container) continue;
 
-  // Get container width to calculate when to reset
-  const containerWidth = scrollContainer.value.scrollWidth / 3; // Divide by 3 because we have 3 sets
+    // Alternate direction for each container
+    const isEvenContainer = index % 2 === 0;
+    const baseDirection = autoplayDirection.value === "forward" ? -1 : 1;
+    const direction = isEvenContainer ? baseDirection : -baseDirection;
 
-  if (autoplayDirection.value === "forward") {
-    // Moving left - when we've scrolled one full set, reset
-    if (scrollPosition.value <= -containerWidth) {
-      scrollPosition.value = 0;
+    scrollPositions.value[index] += actualSpeed * direction;
+
+    // Get container width to calculate when to reset
+    const containerWidth = container.scrollWidth / 3;
+
+    if (direction < 0) {
+      if (scrollPositions.value[index] <= -containerWidth) {
+        scrollPositions.value[index] = 0;
+      }
+    } else {
+      if (scrollPositions.value[index] >= 0) {
+        scrollPositions.value[index] = -containerWidth;
+      }
     }
-  } else {
-    // Moving right - when we've scrolled back one full set, reset
-    if (scrollPosition.value >= 0) {
-      scrollPosition.value = -containerWidth;
-    }
+
+    container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
   }
-
-  // Apply the transform
-  scrollContainer.value.style.transform = `translateX(${scrollPosition.value}px)`;
 
   animationId.value = requestAnimationFrame(animate);
 };
 
-// Initialize scroll position for reverse direction
-const initializeScrollPosition = async () => {
+// Initialize scroll positions
+const initializeScrollPositions = async () => {
+  console.log(`🚀 Initializing ${numberOfContainers.value} containers`);
+
   await nextTick();
-  if (scrollContainer.value && autoplayDirection.value === "reverse") {
-    const containerWidth = scrollContainer.value.scrollWidth / 3;
-    scrollPosition.value = -containerWidth;
+
+  for (let index = 0; index < numberOfContainers.value; index++) {
+    const container = scrollContainers.value[index];
+    if (!container) {
+      console.log(`⚠️ Container ${index} not found`);
+      continue;
+    }
+
+    const isEvenContainer = index % 2 === 0;
+    const shouldReverse = autoplayDirection.value === "reverse";
+
+    let initialPosition = 0;
+    if (
+      (isEvenContainer && shouldReverse) ||
+      (!isEvenContainer && !shouldReverse)
+    ) {
+      initialPosition = -container.scrollWidth / 3;
+    }
+
+    scrollPositions.value[index] = initialPosition;
+    container.style.transform = `translateX(${initialPosition}px)`;
+    console.log(`✅ Container ${index} initialized at ${initialPosition}px`);
   }
+
+  console.log(`🎉 Initialization complete`);
 };
+
+// Watch for changes
+watch(numberOfContainers, async () => {
+  await nextTick();
+  initializeScrollPositions();
+});
+
+watch(autoplayDirection, () => {
+  initializeScrollPositions();
+});
 
 // Keyboard navigation
 const handleKeydown = (event: KeyboardEvent) => {
@@ -189,10 +291,12 @@ const handleKeydown = (event: KeyboardEvent) => {
 onMounted(async () => {
   window.addEventListener("keydown", handleKeydown);
 
-  // Initialize scroll position
-  await initializeScrollPosition();
+  await nextTick();
 
-  // Start the animation loop
+  setTimeout(() => {
+    initializeScrollPositions();
+  }, 100);
+
   animate();
 });
 
@@ -205,15 +309,19 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen relative overflow-hidden">
-    <!-- Header -->
-    <header class="relative z-10 p-6 text-center">
+  <div
+    class="min-h-[100dvh] relative overflow-hidden bg-gradient-to-br from-gray-900 via-black to-gray-900"
+  >
+    <!-- Header - Transparent overlay that content can go under -->
+    <header
+      class="absolute top-0 left-0 right-0 z-50 p-6 text-center bg-gradient-to-b from-black/60 via-black/30 to-transparent backdrop-blur-sm"
+    >
       <h1
-        class="text-4xl md:text-6xl font-bold bg-gradient-to-r from-white via-gray-300 to-gray-500 bg-clip-text text-transparent"
+        class="text-4xl md:text-6xl font-bold bg-gradient-to-r from-white via-gray-300 to-gray-500 bg-clip-text text-transparent drop-shadow-lg"
       >
         Infinite Gallery
       </h1>
-      <p class="mt-4 text-gray-400 text-lg">
+      <p class="mt-4 text-gray-300 text-lg drop-shadow-md">
         Immersive scrolling experience with customizable effects
       </p>
     </header>
@@ -221,7 +329,7 @@ onUnmounted(() => {
     <!-- Control Toggle Button -->
     <button
       @click="toggleControls"
-      class="fixed bottom-6 left-6 z-30 p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all duration-300 shadow-lg"
+      class="fixed bottom-6 left-6 z-50 p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all duration-300 shadow-lg"
       :class="{ 'bg-blue-600/80 hover:bg-blue-600': showControls }"
     >
       <svg
@@ -241,7 +349,7 @@ onUnmounted(() => {
 
     <!-- Control Panel -->
     <div
-      class="control-panel fixed bottom-20 left-6 z-20 p-4 rounded-lg shadow-2xl w-80 max-w-[calc(100vw-2rem)] transition-all duration-300 transform"
+      class="control-panel fixed bottom-20 left-6 z-99 p-4 rounded-lg shadow-2xl w-80 max-w-[calc(100vw-2rem)] transition-all duration-300 transform"
       :class="{
         'translate-y-0 opacity-100': showControls,
         'translate-y-full opacity-0 pointer-events-none': !showControls,
@@ -270,6 +378,43 @@ onUnmounted(() => {
       </div>
 
       <div class="space-y-4">
+        <!-- Number of Containers -->
+        <div>
+          <label class="block text-sm text-gray-300 mb-2"
+            >Scroll Layers: {{ numberOfContainers }}</label
+          >
+          <input
+            v-model="numberOfContainers"
+            type="range"
+            min="1"
+            max="5"
+            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+          />
+          <div class="flex justify-between text-xs text-gray-400 mt-1">
+            <span>1</span>
+            <span>5</span>
+          </div>
+        </div>
+
+        <!-- NEW: Spacing Between Layers -->
+        <div>
+          <label class="block text-sm text-gray-300 mb-2"
+            >Spacing Between Layers: {{ layerSpacing }}rem</label
+          >
+          <input
+            v-model="layerSpacing"
+            type="range"
+            min="0"
+            max="5"
+            step="0.1"
+            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+          />
+          <div class="flex justify-between text-xs text-gray-400 mt-1">
+            <span>0rem (Overlap)</span>
+            <span>5rem (Wide)</span>
+          </div>
+        </div>
+
         <!-- Tilt Degree -->
         <div>
           <label class="block text-sm text-gray-300 mb-2"
@@ -344,38 +489,54 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Scrolling Gallery Container with Tilt -->
-    <div class="relative mt-12 h-[60vh] overflow-hidden flex items-center">
+    <!-- Gallery Container - Maximum page fill, content can go under header -->
+    <div class="w-full h-[100dvh] flex flex-col">
+      <!-- Multiple Scrolling Gallery Containers -->
       <div
-        class="gallery-wrapper w-full h-full flex items-center transition-transform duration-300"
-        :style="containerTiltStyle"
+        v-for="containerIndex in MAX_CONTAINERS"
+        :key="containerIndex"
+        v-show="containerIndex <= numberOfContainers"
+        class="flex items-center transition-all duration-500 ease-out will-change-transform flex-shrink-0"
+        :style="{
+          ...containerTiltStyle,
+          height: `${containerHeight}dvh`,
+          marginBottom: `${layerSpacing}rem`,
+          zIndex: MAX_CONTAINERS - containerIndex + 1,
+        }"
+        @mouseenter="handleMouseEnter"
+        @mouseleave="handleMouseLeave"
       >
         <div
-          ref="scrollContainer"
-          class="flex gap-8 will-change-transform"
-          @mouseenter="handleMouseEnter"
-          @mouseleave="handleMouseLeave"
+          :ref="el => registerContainer(el as HTMLElement, containerIndex - 1)"
+          class="flex gap-6 will-change-transform"
         >
           <div
-            v-for="(image, index) in duplicatedImages"
-            :key="`${image.id}-${Math.floor(index / images.length)}-${
-              index % images.length
-            }`"
+            v-for="(image, imageIndex) in getImagesForContainer(
+              containerIndex - 1
+            )"
+            :key="`container-${containerIndex}-${image.id}-${Math.floor(
+              imageIndex / 8
+            )}-${imageIndex % 8}`"
             class="image-card relative group cursor-pointer rounded-lg overflow-hidden shadow-2xl transition-all duration-300 hover:scale-105 flex-shrink-0"
+            :class="{
+              'w-64 h-72': numberOfContainers >= 4,
+              'w-72 h-80': numberOfContainers === 3,
+              'w-80 h-96': numberOfContainers <= 2,
+            }"
             @click="openModal(image)"
             v-motion
             :initial="{ opacity: 0, y: 50 }"
             :enter="{
               opacity: 1,
               y: 0,
-              transition: { delay: (index % images.length) * 100 },
+              transition: { delay: (imageIndex % 8) * 50 },
             }"
             :hover="{ scale: 1.05 }"
           >
             <img
               :src="image.url"
               :alt="image.title"
-              class="w-80 h-96 object-cover"
+              class="w-full h-full object-cover"
               loading="lazy"
             />
             <div
@@ -390,6 +551,13 @@ onUnmounted(() => {
                 </p>
               </div>
             </div>
+
+            <!-- Container indicator -->
+            <div
+              class="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded"
+            >
+              Layer {{ containerIndex }}
+            </div>
           </div>
         </div>
       </div>
@@ -397,7 +565,7 @@ onUnmounted(() => {
 
     <!-- Background Effects -->
     <div
-      class="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/50 pointer-events-none"
+      class="absolute inset-0 bg-gradient-to-b from-transparent via-black/5 to-black/20 pointer-events-none z-0"
     ></div>
 
     <!-- Modal -->
