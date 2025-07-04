@@ -114,6 +114,7 @@ const selectedImage = ref<ImageItem | null>(null);
 const isModalOpen = ref(false);
 const isPaused = ref(false);
 const showControls = ref(false);
+const isManualScrolling = ref(false);
 
 // Fixed number of containers - always create 5, show/hide based on numberOfContainers
 const MAX_CONTAINERS = 5;
@@ -133,15 +134,36 @@ const containerTiltStyle = computed(() => {
   };
 });
 
-// Calculate container height to fill the page maximally
+// Stable card sizing based on number of containers
+const cardSizeClasses = computed(() => {
+  if (numberOfContainers.value >= 4) {
+    return "w-64 h-72";
+  } else if (numberOfContainers.value === 3) {
+    return "w-72 h-80";
+  } else {
+    return "w-80 h-96";
+  }
+});
+
+// Calculate container height to fill the page maximally, accounting for spacing
 const containerHeight = computed(() => {
-  // Base height that fills the screen divided by number of containers
-  const baseHeight = 100 / numberOfContainers.value; // dvh per container
+  // Calculate total spacing needed between containers
+  const totalSpacingRem = (numberOfContainers.value - 1) * layerSpacing.value;
 
-  // Add extra height based on tilt to ensure full coverage
-  const tiltBonus = Math.abs(tiltDegree.value) * 0.5; // Extra height for tilted containers
+  // Convert rem to vh (approximate conversion: 1rem ≈ 16px, 100vh ≈ viewport height)
+  // Using a more conservative conversion factor
+  const totalSpacingVh = totalSpacingRem * 1.5; // Slightly more conservative conversion
 
-  return Math.min(baseHeight + tiltBonus, 95); // Cap at 95dvh to prevent excessive size
+  // Available height after accounting for spacing
+  const availableHeight = Math.max(100 - totalSpacingVh, 50); // Minimum 50vh available
+
+  // Base height per container
+  const baseHeight = availableHeight / numberOfContainers.value;
+
+  // Add extra height based on tilt to ensure full coverage (reduced bonus)
+  const tiltBonus = Math.abs(tiltDegree.value) * 0.3; // Reduced from 0.5 to 0.3
+
+  return Math.max(baseHeight + tiltBonus, 10); // Minimum 10dvh per container
 });
 
 // Create different image sets for each container
@@ -190,6 +212,79 @@ const handleMouseEnter = () => {
 const handleMouseLeave = () => {
   if (pauseOnHover.value) {
     isPaused.value = false;
+  }
+};
+
+// Manual scroll functionality
+const manualScroll = (
+  direction: "forward" | "reverse",
+  scrollIntensity: number = 1
+) => {
+  if (!autoplay.value && !isModalOpen.value) {
+    const baseScrollAmount = 60; // Reduced base amount for smoother movement
+    const scrollAmount = baseScrollAmount * scrollIntensity; // Allow variable intensity
+
+    // Only animate visible containers
+    for (let index = 0; index < numberOfContainers.value; index++) {
+      const container = scrollContainers.value[index];
+      if (!container) continue;
+
+      // Determine scroll direction based on user input and container alternation
+      const isEvenContainer = index % 2 === 0;
+      const baseDirection = direction === "forward" ? -1 : 1;
+      const actualDirection = isEvenContainer ? baseDirection : -baseDirection;
+
+      scrollPositions.value[index] += scrollAmount * actualDirection;
+
+      // Get container width to calculate when to reset
+      const containerWidth = container.scrollWidth / 3;
+
+      if (actualDirection < 0) {
+        if (scrollPositions.value[index] <= -containerWidth) {
+          scrollPositions.value[index] = 0;
+        }
+      } else {
+        if (scrollPositions.value[index] >= 0) {
+          scrollPositions.value[index] = -containerWidth;
+        }
+      }
+
+      // Add smooth transition for manual scrolling with better easing
+      container.style.transition =
+        "transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+      container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+
+      // Remove transition after animation to avoid interfering with other movements
+      setTimeout(() => {
+        container.style.transition = "";
+      }, 150);
+    }
+  }
+};
+
+// Handle wheel events for manual scrolling
+const handleWheel = (event: WheelEvent) => {
+  if (!autoplay.value && !isModalOpen.value) {
+    event.preventDefault();
+
+    // Very minimal throttle for maximum responsiveness
+    if (isManualScrolling.value) return;
+
+    isManualScrolling.value = true;
+
+    // Calculate scroll intensity based on wheel delta with better scaling for trackpads
+    const deltaY = Math.abs(event.deltaY);
+    // Better scaling for both mouse wheels (larger deltas) and trackpads (smaller deltas)
+    const scrollIntensity = Math.min(Math.max(deltaY / 80, 0.3), 2.5); // Scale between 0.3x and 2.5x
+
+    // Determine direction based on wheel delta
+    const direction = event.deltaY > 0 ? "forward" : "reverse";
+    manualScroll(direction, scrollIntensity);
+
+    // Very short throttle for ultra-smooth experience
+    setTimeout(() => {
+      isManualScrolling.value = false;
+    }, 10); // Reduced to 10ms for maximum responsiveness
   }
 };
 
@@ -290,6 +385,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 onMounted(async () => {
   window.addEventListener("keydown", handleKeydown);
+  window.addEventListener("wheel", handleWheel, { passive: false });
 
   await nextTick();
 
@@ -302,6 +398,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeydown);
+  window.removeEventListener("wheel", handleWheel);
   if (animationId.value) {
     cancelAnimationFrame(animationId.value);
   }
@@ -447,6 +544,15 @@ onUnmounted(() => {
             <input v-model="autoplay" type="checkbox" class="mr-2" />
             <span class="text-sm text-gray-300">Autoplay</span>
           </label>
+          <div
+            v-if="!autoplay"
+            class="mt-2 p-2 bg-blue-900/20 rounded border border-blue-700/30"
+          >
+            <p class="text-xs text-blue-300">
+              💡 Smooth manual scroll enabled: Use mouse wheel or trackpad to
+              control movement
+            </p>
+          </div>
         </div>
 
         <!-- Autoplay Direction -->
@@ -518,11 +624,7 @@ onUnmounted(() => {
               imageIndex / 8
             )}-${imageIndex % 8}`"
             class="image-card relative group cursor-pointer rounded-lg overflow-hidden shadow-2xl transition-all duration-300 hover:scale-105 flex-shrink-0"
-            :class="{
-              'w-64 h-72': numberOfContainers >= 4,
-              'w-72 h-80': numberOfContainers === 3,
-              'w-80 h-96': numberOfContainers <= 2,
-            }"
+            :class="cardSizeClasses"
             @click="openModal(image)"
             v-motion
             :initial="{ opacity: 0, y: 50 }"
