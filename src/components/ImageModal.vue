@@ -12,7 +12,7 @@ interface Props {
   image: ImageItem;
 }
 
-const props = defineProps<Props>();
+// const props = defineProps<Props>();
 const emit = defineEmits<{
   close: [];
 }>();
