@@ -115,6 +115,7 @@ const isModalOpen = ref(false);
 const isPaused = ref(false);
 const showControls = ref(false);
 const isManualScrolling = ref(false);
+const forceUpdateKey = ref(0);
 
 // Fixed number of containers - always create 5, show/hide based on numberOfContainers
 const MAX_CONTAINERS = 5;
@@ -134,15 +135,24 @@ const containerTiltStyle = computed(() => {
   };
 });
 
-// Stable card sizing based on number of containers
+// Stable card sizing based on number of containers with force update dependency
 const cardSizeClasses = computed(() => {
+  // Include forceUpdateKey to ensure reactivity when numberOfContainers changes
+  const updateKey = forceUpdateKey.value; // This ensures the computed re-runs
+
+  let sizeClass = "";
   if (numberOfContainers.value >= 4) {
-    return "w-64 h-72";
+    sizeClass = "w-64 h-72";
   } else if (numberOfContainers.value === 3) {
-    return "w-72 h-80";
+    sizeClass = "w-72 h-80";
   } else {
-    return "w-80 h-96";
+    sizeClass = "w-80 h-96";
   }
+
+  console.log(
+    `🎨 Card size updated: ${sizeClass} (containers: ${numberOfContainers.value}, updateKey: ${updateKey})`
+  );
+  return sizeClass;
 });
 
 // Calculate container height to fill the page maximally, accounting for spacing
@@ -363,9 +373,20 @@ const initializeScrollPositions = async () => {
 };
 
 // Watch for changes
-watch(numberOfContainers, async () => {
+watch(numberOfContainers, async (newValue, oldValue) => {
+  console.log(`🔄 Container count changed: ${oldValue} → ${newValue}`);
+
+  // Force re-render by updating the key
+  forceUpdateKey.value++;
+
+  // Wait for DOM updates
   await nextTick();
-  initializeScrollPositions();
+
+  // Additional delay to ensure all transitions complete
+  setTimeout(() => {
+    initializeScrollPositions();
+    console.log(`✅ Re-initialization complete for ${newValue} containers`);
+  }, 100);
 });
 
 watch(autoplayDirection, () => {
@@ -600,7 +621,7 @@ onUnmounted(() => {
       <!-- Multiple Scrolling Gallery Containers -->
       <div
         v-for="containerIndex in MAX_CONTAINERS"
-        :key="containerIndex"
+        :key="`container-${containerIndex}-${forceUpdateKey}`"
         v-show="containerIndex <= numberOfContainers"
         class="flex items-center transition-all duration-500 ease-out will-change-transform flex-shrink-0"
         :style="{
@@ -622,7 +643,9 @@ onUnmounted(() => {
             )"
             :key="`container-${containerIndex}-${image.id}-${Math.floor(
               imageIndex / 8
-            )}-${imageIndex % 8}`"
+            )}-${
+              imageIndex % 8
+            }-layers-${numberOfContainers}-update-${forceUpdateKey}`"
             class="image-card relative group cursor-pointer rounded-lg overflow-hidden shadow-2xl transition-all duration-300 hover:scale-105 flex-shrink-0"
             :class="cardSizeClasses"
             @click="openModal(image)"

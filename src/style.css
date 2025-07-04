@@ -82,3 +82,8 @@ body {
 .will-change-transform {
   will-change: transform;
 }
+
+/* Force layout recalculation for card size changes */
+.image-card {
+  contain: layout style;
+}
