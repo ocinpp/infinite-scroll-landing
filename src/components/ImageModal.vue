@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, toRefs } from "vue";
 
 interface ImageItem {
   id: number;
@@ -12,7 +12,10 @@ interface Props {
   image: ImageItem;
 }
 
-// const props = defineProps<Props>();
+const props = defineProps<Props>();
+
+// Make props reactive for template access
+const { image } = toRefs(props);
 const emit = defineEmits<{
   close: [];
 }>();
