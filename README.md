@@ -21,11 +21,13 @@ A sophisticated infinite scrolling image gallery built with Vue 3, TypeScript, a
 - **Layer spacing control** (0-20rem)
 
 ### 🖱️ Manual Scrolling
-- **Responsive wheel/trackpad support** with immediate feedback
-- **Momentum-based deceleration** for natural feel
+- **Desktop**: Mouse wheel and trackpad support with immediate feedback
+- **Mobile**: Touch swipe gestures with velocity detection
+- **Momentum-based deceleration** for natural feel on all devices
 - **Synchronized movement** across all layers
-- **Intensity-based scrolling** (harder scroll = more movement)
+- **Intensity-based scrolling** (harder scroll/swipe = more movement)
 - **Smooth gradual stopping** instead of abrupt halts
+- **Cross-platform compatibility** (desktop and mobile)
 
 ### 🔧 Technical Features
 - **Type-safe TypeScript** implementation
@@ -92,10 +94,23 @@ The gallery automatically initializes with default settings:
 
 ### Manual Scrolling
 When autoplay is disabled:
+
+#### Desktop
 - **Mouse wheel**: Scroll up/down to move gallery
 - **Trackpad**: Use two-finger scroll gestures
 - **Momentum**: Multiple rapid scrolls build momentum for longer gliding
+
+#### Mobile
+- **Smart gesture detection**: Tap to open modal, swipe to scroll
+- **Touch swipes**: Swipe up/down anywhere to move gallery
+- **Velocity detection**: Faster swipes create more momentum
+- **Natural feel**: Touch direction matches scroll direction
+- **Easy access**: Swipe works on images, cards, and background areas
+
+#### All Devices
+- **Momentum building**: Multiple rapid inputs build momentum for longer gliding
 - **Deceleration**: Smooth gradual slowdown instead of abrupt stopping
+- **Synchronized movement**: All layers move together perfectly
 
 ### Image Modal
 - **Click any image** to open in modal view
@@ -114,8 +129,12 @@ testing/
 ├── animation-debug.js            # Animation monitoring
 ├── comprehensive-test.js         # Full automated test suite
 ├── debug-layer-change.js         # Layer change debugging
+├── improved-mobile-touch-test.js # Improved mobile touch (tap + swipe) tests
 ├── interaction-test.js           # User interaction tests
 ├── layer-change-test.js          # Layer change specific tests
+├── mobile-controls-test.js       # Mobile controls functionality tests
+├── mobile-touch-test.js          # Mobile touch scrolling tests
+├── modal-manual-scroll-test.js   # Modal opening in manual scroll mode
 ├── momentum-deceleration-test.js # Momentum physics tests
 ├── responsive-scroll-test.js     # Manual scroll responsiveness
 └── synchronized-scroll-test.js   # Container synchronization tests
@@ -131,6 +150,7 @@ testing/
 - **Animation System**: Verifies autoplay start/stop cycles
 - **Layer Changes**: Tests dynamic layer adjustment and autoplay resumption
 - **Manual Scrolling**: Validates wheel/trackpad responsiveness and momentum
+- **Mobile Touch**: Tests touch swipe gestures and velocity detection
 - **Hover Interactions**: Confirms pause/resume functionality
 - **Synchronization**: Ensures all containers move together
 - **Performance**: Monitors frame rates and memory usage
