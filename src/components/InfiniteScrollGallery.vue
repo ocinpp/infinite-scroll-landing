@@ -116,6 +116,11 @@ const isPaused = ref(false);
 const showControls = ref(false);
 const isManualScrolling = ref(false);
 
+// Simple momentum for gradual deceleration
+const globalMomentum = ref(0);
+const momentumDirection = ref<"forward" | "reverse">("forward");
+const momentumAnimationId = ref<number | null>(null);
+
 // Computed property for visible container indices
 const visibleContainerIndices = computed(() => {
   const indices = [];
@@ -344,51 +349,31 @@ const handleMouseLeave = () => {
   }
 };
 
-// Robust manual scroll functionality
+// Manual scroll with momentum for gradual deceleration
 const manualScroll = (
   direction: "forward" | "reverse",
   scrollIntensity: number = 1
 ) => {
   if (!autoplay.value && !isModalOpen.value && isInitialized.value) {
-    const baseScrollAmount = 60;
-    const scrollAmount = baseScrollAmount * scrollIntensity;
+    // Add to momentum instead of direct position change
+    const baseMomentum = 4; // Base momentum amount
+    const momentumToAdd = baseMomentum * scrollIntensity;
 
-    // Only animate visible containers that are properly registered
-    for (let index = 0; index < numberOfContainers.value; index++) {
-      const container = scrollContainers.value[index];
-      if (!container || container.scrollWidth === 0) continue;
+    // Set direction for momentum
+    momentumDirection.value = direction;
 
-      // Determine scroll direction based on user input and container alternation
-      const isEvenContainer = index % 2 === 0;
-      const baseDirection = direction === "forward" ? -1 : 1;
-      const actualDirection = isEvenContainer ? baseDirection : -baseDirection;
+    // Add to existing momentum (allows building up speed)
+    globalMomentum.value += momentumToAdd;
 
-      scrollPositions.value[index] += scrollAmount * actualDirection;
+    // Cap maximum momentum to prevent excessive speed
+    const maxMomentum = 20;
+    if (globalMomentum.value > maxMomentum) {
+      globalMomentum.value = maxMomentum;
+    }
 
-      // Get container width to calculate when to reset
-      const containerWidth = container.scrollWidth / 3;
-
-      if (actualDirection < 0) {
-        if (scrollPositions.value[index] <= -containerWidth) {
-          scrollPositions.value[index] = 0;
-        }
-      } else {
-        if (scrollPositions.value[index] >= 0) {
-          scrollPositions.value[index] = -containerWidth;
-        }
-      }
-
-      // Add smooth transition for manual scrolling with better easing
-      container.style.transition =
-        "transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
-      container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
-
-      // Remove transition after animation to avoid interfering with other movements
-      setTimeout(() => {
-        if (container.style) {
-          container.style.transition = "";
-        }
-      }, 150);
+    // Start momentum animation if not already running
+    if (!momentumAnimationId.value) {
+      momentumAnimationId.value = requestAnimationFrame(animateMomentum);
     }
   }
 };
@@ -437,6 +422,59 @@ const stopAnimation = () => {
     animationId.value = null;
     console.log(`⏹️ Animation stopped`);
   }
+};
+
+// Stop momentum animation
+const stopMomentum = () => {
+  if (momentumAnimationId.value) {
+    cancelAnimationFrame(momentumAnimationId.value);
+    momentumAnimationId.value = null;
+  }
+  globalMomentum.value = 0;
+};
+
+// Momentum animation loop - applies same movement to all containers
+const animateMomentum = () => {
+  if (Math.abs(globalMomentum.value) < 0.5) {
+    // Momentum too small, stop animation
+    stopMomentum();
+    return;
+  }
+
+  // Apply the same momentum to all containers synchronously
+  for (let index = 0; index < numberOfContainers.value; index++) {
+    const container = scrollContainers.value[index];
+    if (!container || container.scrollWidth === 0) continue;
+
+    // Determine direction for each container (same logic as manual scroll)
+    const isEvenContainer = index % 2 === 0;
+    const baseDirection = momentumDirection.value === "forward" ? -1 : 1;
+    const actualDirection = isEvenContainer ? baseDirection : -baseDirection;
+
+    // Apply momentum to position
+    scrollPositions.value[index] += globalMomentum.value * actualDirection;
+
+    // Handle wrapping
+    const containerWidth = container.scrollWidth / 3;
+    if (actualDirection < 0) {
+      if (scrollPositions.value[index] <= -containerWidth) {
+        scrollPositions.value[index] = 0;
+      }
+    } else {
+      if (scrollPositions.value[index] >= 0) {
+        scrollPositions.value[index] = -containerWidth;
+      }
+    }
+
+    // Apply position immediately
+    container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+  }
+
+  // Gradually reduce momentum (smooth deceleration)
+  globalMomentum.value *= 0.94; // Adjust this value to control deceleration rate
+
+  // Continue animation
+  momentumAnimationId.value = requestAnimationFrame(animateMomentum);
 };
 
 // Seamless infinite scroll animation
@@ -615,6 +653,9 @@ watch(numberOfContainers, async (newValue, oldValue) => {
   // Clear all container references and positions
   scrollContainers.value = Array(MAX_CONTAINERS).fill(null);
   scrollPositions.value = Array(MAX_CONTAINERS).fill(0);
+
+  // Stop and clear momentum
+  stopMomentum();
 
   // Reset initialization state
   isInitialized.value = false;
@@ -834,13 +875,13 @@ onUnmounted(() => {
             v-model.number="layerSpacing"
             type="range"
             min="0"
-            max="10"
+            max="20"
             step="0.1"
             class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
           <div class="flex justify-between text-xs text-gray-400 mt-1">
             <span>0rem (Overlap)</span>
-            <span>10rem (Very Wide)</span>
+            <span>20rem (Very Wide)</span>
           </div>
         </div>
 
