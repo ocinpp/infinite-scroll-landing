@@ -115,13 +115,41 @@ const isModalOpen = ref(false);
 const isPaused = ref(false);
 const showControls = ref(false);
 const isManualScrolling = ref(false);
-const forceUpdateKey = ref(0);
+
+// Computed property for visible container indices
+const visibleContainerIndices = computed(() => {
+  const indices = [];
+  for (let i = 1; i <= numberOfContainers.value; i++) {
+    indices.push(i);
+  }
+  return indices;
+});
 
 // Fixed number of containers - always create 5, show/hide based on numberOfContainers
 const MAX_CONTAINERS = 5;
 const scrollContainers = ref<HTMLElement[]>(Array(MAX_CONTAINERS).fill(null));
-const animationId = ref<number>();
+const animationId = ref<number | null>(null);
 const scrollPositions = ref<number[]>(Array(MAX_CONTAINERS).fill(0));
+const isInitialized = ref(false);
+
+// Simple debug function
+const debugSystemState = () => {
+  console.log("🔍 System State Debug:");
+  console.log(`  - isInitialized: ${isInitialized.value}`);
+  console.log(`  - numberOfContainers: ${numberOfContainers.value}`);
+  console.log(`  - autoplay: ${autoplay.value}`);
+  console.log(`  - animationId: ${animationId.value}`);
+
+  for (let i = 0; i < numberOfContainers.value; i++) {
+    const container = scrollContainers.value[i];
+    const position = scrollPositions.value[i];
+    console.log(
+      `  - Container ${i}: ${
+        container ? "registered" : "missing"
+      }, position: ${position}, scrollWidth: ${container?.scrollWidth || "N/A"}`
+    );
+  }
+};
 
 // Computed properties
 const containerTiltStyle = computed(() => {
@@ -135,11 +163,8 @@ const containerTiltStyle = computed(() => {
   };
 });
 
-// Stable card sizing based on number of containers with force update dependency
+// Stable card sizing based on number of containers
 const cardSizeClasses = computed(() => {
-  // Include forceUpdateKey to ensure reactivity when numberOfContainers changes
-  const updateKey = forceUpdateKey.value; // This ensures the computed re-runs
-
   let sizeClass = "";
   if (numberOfContainers.value >= 4) {
     sizeClass = "w-64 h-72";
@@ -150,7 +175,7 @@ const cardSizeClasses = computed(() => {
   }
 
   console.log(
-    `🎨 Card size updated: ${sizeClass} (containers: ${numberOfContainers.value}, updateKey: ${updateKey})`
+    `🎨 Card size updated: ${sizeClass} (containers: ${numberOfContainers.value})`
   );
   return sizeClass;
 });
@@ -160,20 +185,26 @@ const containerHeight = computed(() => {
   // Calculate total spacing needed between containers
   const totalSpacingRem = (numberOfContainers.value - 1) * layerSpacing.value;
 
-  // Convert rem to vh (approximate conversion: 1rem ≈ 16px, 100vh ≈ viewport height)
-  // Using a more conservative conversion factor
-  const totalSpacingVh = totalSpacingRem * 1.5; // Slightly more conservative conversion
+  // Convert rem to vh with better scaling for larger values
+  // 1rem ≈ 16px, typical viewport height ≈ 800-1200px
+  const totalSpacingVh = totalSpacingRem * 2; // More accurate conversion for larger spacing
 
   // Available height after accounting for spacing
-  const availableHeight = Math.max(100 - totalSpacingVh, 50); // Minimum 50vh available
+  const availableHeight = Math.max(100 - totalSpacingVh, 30); // Minimum 30vh available
 
   // Base height per container
   const baseHeight = availableHeight / numberOfContainers.value;
 
   // Add extra height based on tilt to ensure full coverage (reduced bonus)
-  const tiltBonus = Math.abs(tiltDegree.value) * 0.3; // Reduced from 0.5 to 0.3
+  const tiltBonus = Math.abs(tiltDegree.value) * 0.2; // Further reduced for better spacing
 
-  return Math.max(baseHeight + tiltBonus, 10); // Minimum 10dvh per container
+  const finalHeight = Math.max(baseHeight + tiltBonus, 8); // Minimum 8dvh per container
+
+  console.log(
+    `📏 Container height: ${finalHeight}dvh (spacing: ${layerSpacing.value}rem, containers: ${numberOfContainers.value})`
+  );
+
+  return finalHeight;
 });
 
 // Create different image sets for each container
@@ -190,11 +221,99 @@ const getImagesForContainer = (containerIndex: number) => {
   return [...containerImages, ...containerImages, ...containerImages];
 };
 
-// Container registration function
+// Simple container registration
 const registerContainer = (el: HTMLElement | null, index: number) => {
-  if (el && index >= 0 && index < MAX_CONTAINERS) {
-    scrollContainers.value[index] = el;
+  if (el && index >= 1 && index <= MAX_CONTAINERS) {
+    const arrayIndex = index - 1; // Convert to 0-based
+
+    // Prevent duplicate registration
+    if (scrollContainers.value[arrayIndex] === el) {
+      console.log(`⏭️ Container ${index} already registered, skipping`);
+      return;
+    }
+
+    scrollContainers.value[arrayIndex] = el;
     console.log(`✅ Container ${index} registered`);
+
+    // Simple initialization - just set initial position
+    const isEvenContainer = arrayIndex % 2 === 0;
+    const shouldReverse = autoplayDirection.value === "reverse";
+
+    let initialPosition = 0;
+    if (
+      (isEvenContainer && shouldReverse) ||
+      (!isEvenContainer && !shouldReverse)
+    ) {
+      // Wait for element to have content, then set position
+      setTimeout(() => {
+        const width = el.scrollWidth || 2400; // fallback width
+        initialPosition = -width / 3;
+        scrollPositions.value[arrayIndex] = initialPosition;
+        el.style.transform = `translateX(${initialPosition}px)`;
+        console.log(
+          `✅ Container ${index} initialized at ${initialPosition}px`
+        );
+
+        // Check if all containers are ready
+        checkIfAllReady();
+      }, 100);
+    } else {
+      scrollPositions.value[arrayIndex] = 0;
+      el.style.transform = `translateX(0px)`;
+      console.log(`✅ Container ${index} initialized at 0px`);
+      checkIfAllReady();
+    }
+  }
+};
+
+// Simple check if all containers are ready
+const checkIfAllReady = () => {
+  // Capture values at the same time to avoid race conditions and ensure number type
+  const currentContainerCount = Number(numberOfContainers.value);
+  let readyCount = 0;
+
+  for (let i = 0; i < currentContainerCount; i++) {
+    if (scrollContainers.value[i]) {
+      readyCount++;
+    }
+  }
+
+  console.log(
+    `📊 Ready containers: ${readyCount}/${currentContainerCount} (isInitialized: ${isInitialized.value}, autoplay: ${autoplay.value}, animationId: ${animationId.value})`
+  );
+
+  console.log(
+    `🔍 Condition check: readyCount(${readyCount}) === currentContainerCount(${currentContainerCount}) = ${
+      readyCount === currentContainerCount
+    }`
+  );
+
+  // Always check if we should start, regardless of isInitialized state
+  if (readyCount === currentContainerCount) {
+    console.log(`✅ All containers ready! Checking what to do...`);
+
+    if (!isInitialized.value) {
+      console.log(`🚀 Setting initialized=true and starting animation...`);
+      isInitialized.value = true;
+      console.log(`🎉 All containers ready! Starting autoplay...`);
+      if (autoplay.value) {
+        startAnimation();
+      }
+    } else if (autoplay.value && !animationId.value) {
+      // If already initialized but animation stopped, restart it
+      console.log(`🔄 Restarting autoplay...`);
+      startAnimation();
+    } else if (isInitialized.value && autoplay.value && animationId.value) {
+      console.log(`✅ System already running properly, no action needed`);
+    } else {
+      console.log(
+        `⚠️ Unexpected state: initialized=${isInitialized.value}, autoplay=${autoplay.value}, animationId=${animationId.value}`
+      );
+    }
+  } else {
+    console.log(
+      `⏳ Not all containers ready yet: ${readyCount}/${currentContainerCount}`
+    );
   }
 };
 
@@ -225,19 +344,19 @@ const handleMouseLeave = () => {
   }
 };
 
-// Manual scroll functionality
+// Robust manual scroll functionality
 const manualScroll = (
   direction: "forward" | "reverse",
   scrollIntensity: number = 1
 ) => {
-  if (!autoplay.value && !isModalOpen.value) {
-    const baseScrollAmount = 60; // Reduced base amount for smoother movement
-    const scrollAmount = baseScrollAmount * scrollIntensity; // Allow variable intensity
+  if (!autoplay.value && !isModalOpen.value && isInitialized.value) {
+    const baseScrollAmount = 60;
+    const scrollAmount = baseScrollAmount * scrollIntensity;
 
-    // Only animate visible containers
+    // Only animate visible containers that are properly registered
     for (let index = 0; index < numberOfContainers.value; index++) {
       const container = scrollContainers.value[index];
-      if (!container) continue;
+      if (!container || container.scrollWidth === 0) continue;
 
       // Determine scroll direction based on user input and container alternation
       const isEvenContainer = index % 2 === 0;
@@ -266,7 +385,9 @@ const manualScroll = (
 
       // Remove transition after animation to avoid interfering with other movements
       setTimeout(() => {
-        container.style.transition = "";
+        if (container.style) {
+          container.style.transition = "";
+        }
       }, 150);
     }
   }
@@ -298,10 +419,34 @@ const handleWheel = (event: WheelEvent) => {
   }
 };
 
+// Robust animation system
+const startAnimation = () => {
+  if (animationId.value) {
+    console.log(
+      `⚠️ Animation already running (ID: ${animationId.value}), not starting new one`
+    );
+    return;
+  }
+  animationId.value = requestAnimationFrame(animate);
+  console.log(`🎬 Animation started with ID: ${animationId.value}`);
+};
+
+const stopAnimation = () => {
+  if (animationId.value) {
+    cancelAnimationFrame(animationId.value);
+    animationId.value = null;
+    console.log(`⏹️ Animation stopped`);
+  }
+};
+
 // Seamless infinite scroll animation
 const animate = () => {
-  if (!autoplay.value || isPaused.value) {
-    animationId.value = requestAnimationFrame(animate);
+  if (!autoplay.value || isPaused.value || !isInitialized.value) {
+    // Stop animation if conditions not met
+    console.log(
+      `⏹️ Stopping animation: autoplay=${autoplay.value}, paused=${isPaused.value}, initialized=${isInitialized.value}`
+    );
+    stopAnimation();
     return;
   }
 
@@ -309,10 +454,48 @@ const animate = () => {
   const speedMultiplier = scrollSpeed.value / 10;
   const actualSpeed = (pixelsPerSecond * speedMultiplier) / 60;
 
-  // Only animate visible containers
+  // Only animate visible containers that are properly loaded
   for (let index = 0; index < numberOfContainers.value; index++) {
     const container = scrollContainers.value[index];
-    if (!container) continue;
+    if (!container) {
+      continue;
+    }
+
+    // If container has no scrollWidth, try to use fallback calculation
+    if (container.scrollWidth === 0) {
+      // Use fallback width calculation for animation
+      const cardWidth =
+        numberOfContainers.value >= 4
+          ? 256
+          : numberOfContainers.value === 3
+          ? 288
+          : 320;
+      const gap = 24;
+      const cardsPerSet = 8;
+      const fallbackWidth = (cardWidth + gap) * cardsPerSet * 3;
+
+      // Use fallback width for animation calculations
+      const isEvenContainer = index % 2 === 0;
+      const baseDirection = autoplayDirection.value === "forward" ? -1 : 1;
+      const direction = isEvenContainer ? baseDirection : -baseDirection;
+
+      scrollPositions.value[index] += actualSpeed * direction;
+
+      const containerWidth = fallbackWidth / 3;
+
+      if (direction < 0) {
+        if (scrollPositions.value[index] <= -containerWidth) {
+          scrollPositions.value[index] = 0;
+        }
+      } else {
+        if (scrollPositions.value[index] >= 0) {
+          scrollPositions.value[index] = -containerWidth;
+        }
+      }
+
+      container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+      continue;
+    }
 
     // Alternate direction for each container
     const isEvenContainer = index % 2 === 0;
@@ -340,57 +523,178 @@ const animate = () => {
   animationId.value = requestAnimationFrame(animate);
 };
 
-// Initialize scroll positions
-const initializeScrollPositions = async () => {
-  console.log(`🚀 Initializing ${numberOfContainers.value} containers`);
+// Complete system reset and initialization
+const resetScrollSystem = async () => {
+  console.log(
+    `🔄 Resetting scroll system for ${numberOfContainers.value} containers`
+  );
 
-  await nextTick();
+  // Stop current animation
+  stopAnimation();
 
-  for (let index = 0; index < numberOfContainers.value; index++) {
-    const container = scrollContainers.value[index];
-    if (!container) {
-      console.log(`⚠️ Container ${index} not found`);
-      continue;
-    }
+  // Mark as not initialized
+  isInitialized.value = false;
 
-    const isEvenContainer = index % 2 === 0;
-    const shouldReverse = autoplayDirection.value === "reverse";
+  // Clear all container references and positions
+  scrollContainers.value = Array(MAX_CONTAINERS).fill(null);
+  scrollPositions.value = Array(MAX_CONTAINERS).fill(0);
 
-    let initialPosition = 0;
-    if (
-      (isEvenContainer && shouldReverse) ||
-      (!isEvenContainer && !shouldReverse)
-    ) {
-      initialPosition = -container.scrollWidth / 3;
-    }
-
-    scrollPositions.value[index] = initialPosition;
-    container.style.transform = `translateX(${initialPosition}px)`;
-    console.log(`✅ Container ${index} initialized at ${initialPosition}px`);
-  }
-
-  console.log(`🎉 Initialization complete`);
-};
-
-// Watch for changes
-watch(numberOfContainers, async (newValue, oldValue) => {
-  console.log(`🔄 Container count changed: ${oldValue} → ${newValue}`);
-
-  // Force re-render by updating the key
-  forceUpdateKey.value++;
+  console.log(`🚫 Cleared all container data`);
 
   // Wait for DOM updates
   await nextTick();
 
-  // Additional delay to ensure all transitions complete
+  // Wait for containers to be re-registered and content loaded
+  const waitForAllContainers = (attempts = 0) => {
+    if (attempts > 150) {
+      // Max 15 seconds
+      console.warn(
+        `⚠️ Some containers failed to load after 15 seconds, proceeding anyway`
+      );
+      isInitialized.value = true;
+      if (autoplay.value) {
+        startAnimation();
+      }
+      return;
+    }
+
+    // Check if all visible containers are loaded with images
+    let allLoaded = true;
+    for (let i = 0; i < numberOfContainers.value; i++) {
+      const container = scrollContainers.value[i];
+      if (!container) {
+        allLoaded = false;
+        break;
+      }
+
+      // Check if container has images and they're loaded
+      const images = container.querySelectorAll("img");
+      if (images.length === 0) {
+        allLoaded = false;
+        break;
+      }
+
+      let containerImagesLoaded = true;
+      images.forEach((img) => {
+        if (!img.complete || img.naturalHeight === 0) {
+          containerImagesLoaded = false;
+        }
+      });
+
+      if (!containerImagesLoaded || container.scrollWidth === 0) {
+        allLoaded = false;
+        break;
+      }
+    }
+
+    if (allLoaded) {
+      isInitialized.value = true;
+      if (autoplay.value) {
+        startAnimation();
+      }
+      console.log(
+        `✅ All ${numberOfContainers.value} containers loaded and ready`
+      );
+    } else {
+      // Wait 100ms and check again
+      setTimeout(() => waitForAllContainers(attempts + 1), 100);
+    }
+  };
+
+  // Start waiting for all containers
+  setTimeout(() => waitForAllContainers(), 300);
+};
+
+// Simple watcher for layer changes
+watch(numberOfContainers, async (newValue, oldValue) => {
+  console.log(`🔄 Container count changed: ${oldValue} → ${newValue}`);
+
+  // Stop animation
+  stopAnimation();
+
+  // Clear all container references and positions
+  scrollContainers.value = Array(MAX_CONTAINERS).fill(null);
+  scrollPositions.value = Array(MAX_CONTAINERS).fill(0);
+
+  // Reset initialization state
+  isInitialized.value = false;
+
+  // Wait for DOM update
+  await nextTick();
+
+  console.log(`🔄 Waiting for ${newValue} containers to register...`);
+
+  // Give containers time to register and check readiness
   setTimeout(() => {
-    initializeScrollPositions();
-    console.log(`✅ Re-initialization complete for ${newValue} containers`);
-  }, 100);
+    console.log(`🔍 Checking if all ${newValue} containers are ready...`);
+    checkIfAllReady();
+  }, 500);
+
+  // Fallback check in case containers take longer
+  setTimeout(() => {
+    if (!isInitialized.value) {
+      console.log(`⚠️ Fallback: Force checking readiness after 2 seconds`);
+      checkIfAllReady();
+    }
+  }, 2000);
 });
 
-watch(autoplayDirection, () => {
-  initializeScrollPositions();
+watch(autoplayDirection, async () => {
+  console.log(`🔄 Autoplay direction changed: ${autoplayDirection.value}`);
+  await resetScrollSystem();
+});
+
+// Watch for autoplay changes to ensure animation restarts properly
+watch(autoplay, (newValue) => {
+  console.log(`🔄 Autoplay changed: ${newValue}`);
+  if (newValue) {
+    // Start animation when autoplay is enabled
+    startAnimation();
+  } else {
+    // Stop animation when autoplay is disabled
+    stopAnimation();
+  }
+});
+
+// Watch for spacing changes to ensure proper layout
+watch(layerSpacing, async (newValue, oldValue) => {
+  console.log(`🔄 Layer spacing changed: ${oldValue}rem → ${newValue}rem`);
+  await nextTick();
+  // No need to force re-render, Vue's reactivity will handle it
+});
+
+// Watch for speed changes to ensure they take effect immediately
+watch(scrollSpeed, (newValue) => {
+  console.log(`🔄 Scroll speed changed: ${newValue}`);
+});
+
+// Watch for pause on hover changes
+watch(pauseOnHover, (newValue) => {
+  console.log(`🔄 Pause on hover changed: ${newValue}`);
+  // Reset pause state when this setting changes
+  if (!newValue) {
+    isPaused.value = false;
+  }
+});
+
+// Watch for pause state changes to restart animation
+watch(isPaused, (newValue, oldValue) => {
+  console.log(`🔄 Pause state changed: ${oldValue} → ${newValue}`);
+  if (
+    !newValue &&
+    autoplay.value &&
+    isInitialized.value &&
+    !animationId.value
+  ) {
+    console.log(`🔄 Restarting animation after unpause`);
+    startAnimation();
+  }
+});
+
+// Watch for tilt changes - simplified
+watch([tiltDegree, tiltDirection], () => {
+  console.log(`🔄 Tilt changed: ${tiltDegree.value}° ${tiltDirection.value}`);
+  // Tilt changes don't need to reset the scroll system, just update styles
 });
 
 // Keyboard navigation
@@ -410,11 +714,18 @@ onMounted(async () => {
 
   await nextTick();
 
-  setTimeout(() => {
-    initializeScrollPositions();
-  }, 100);
+  // Use the proper initialization system instead of forcing it
+  console.log(
+    `🚀 Application mounted, waiting for containers to initialize...`
+  );
 
-  animate();
+  // Simple initialization - just wait for containers to register
+  console.log(`🚀 Application mounted, containers will auto-initialize...`);
+
+  // Expose debug function for development
+  if (typeof window !== "undefined") {
+    (window as any).debugGalleryState = debugSystemState;
+  }
 });
 
 onUnmounted(() => {
@@ -502,7 +813,7 @@ onUnmounted(() => {
             >Scroll Layers: {{ numberOfContainers }}</label
           >
           <input
-            v-model="numberOfContainers"
+            v-model.number="numberOfContainers"
             type="range"
             min="1"
             max="5"
@@ -520,16 +831,16 @@ onUnmounted(() => {
             >Spacing Between Layers: {{ layerSpacing }}rem</label
           >
           <input
-            v-model="layerSpacing"
+            v-model.number="layerSpacing"
             type="range"
             min="0"
-            max="5"
+            max="10"
             step="0.1"
             class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
           <div class="flex justify-between text-xs text-gray-400 mt-1">
             <span>0rem (Overlap)</span>
-            <span>5rem (Wide)</span>
+            <span>10rem (Very Wide)</span>
           </div>
         </div>
 
@@ -574,6 +885,14 @@ onUnmounted(() => {
               control movement
             </p>
           </div>
+          <div
+            v-if="!isInitialized"
+            class="mt-2 p-2 bg-yellow-900/20 rounded border border-yellow-700/30"
+          >
+            <p class="text-xs text-yellow-300">
+              ⏳ Loading containers... Please wait
+            </p>
+          </div>
         </div>
 
         <!-- Autoplay Direction -->
@@ -602,7 +921,7 @@ onUnmounted(() => {
             >Speed: {{ scrollSpeed }}</label
           >
           <input
-            v-model="scrollSpeed"
+            v-model.number="scrollSpeed"
             type="range"
             min="5"
             max="50"
@@ -620,9 +939,8 @@ onUnmounted(() => {
     <div class="w-full h-[100dvh] flex flex-col">
       <!-- Multiple Scrolling Gallery Containers -->
       <div
-        v-for="containerIndex in MAX_CONTAINERS"
-        :key="`container-${containerIndex}-${forceUpdateKey}`"
-        v-show="containerIndex <= numberOfContainers"
+        v-for="containerIndex in visibleContainerIndices"
+        :key="`container-${containerIndex}`"
         class="flex items-center transition-all duration-500 ease-out will-change-transform flex-shrink-0"
         :style="{
           ...containerTiltStyle,
@@ -634,18 +952,14 @@ onUnmounted(() => {
         @mouseleave="handleMouseLeave"
       >
         <div
-          :ref="el => registerContainer(el as HTMLElement, containerIndex - 1)"
+          :ref="el => registerContainer(el as HTMLElement, containerIndex)"
           class="flex gap-6 will-change-transform"
         >
           <div
             v-for="(image, imageIndex) in getImagesForContainer(
               containerIndex - 1
             )"
-            :key="`container-${containerIndex}-${image.id}-${Math.floor(
-              imageIndex / 8
-            )}-${
-              imageIndex % 8
-            }-layers-${numberOfContainers}-update-${forceUpdateKey}`"
+            :key="`${containerIndex}-${image.id}-${imageIndex}`"
             class="image-card relative group cursor-pointer rounded-lg overflow-hidden shadow-2xl transition-all duration-300 hover:scale-105 flex-shrink-0"
             :class="cardSizeClasses"
             @click="openModal(image)"
