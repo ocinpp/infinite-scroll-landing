@@ -121,6 +121,13 @@ const globalMomentum = ref(0);
 const momentumDirection = ref<"forward" | "reverse">("forward");
 const momentumAnimationId = ref<number | null>(null);
 
+// Touch handling for mobile
+const touchStartY = ref(0);
+const touchStartTime = ref(0);
+const isTouching = ref(false);
+const touchStartX = ref(0);
+const touchMoved = ref(false);
+
 // Computed property for visible container indices
 const visibleContainerIndices = computed(() => {
   const indices = [];
@@ -337,6 +344,20 @@ const toggleControls = () => {
   showControls.value = !showControls.value;
 };
 
+// Handle clicks outside controls to close on mobile
+const handleDocumentClick = (event: Event) => {
+  if (showControls.value) {
+    const target = event.target as HTMLElement;
+    const isControlsArea =
+      target.closest(".control-panel") || target.closest("[data-controls]");
+
+    // Don't close controls when clicking on controls area
+    if (!isControlsArea) {
+      showControls.value = false;
+    }
+  }
+};
+
 const handleMouseEnter = () => {
   if (pauseOnHover.value) {
     isPaused.value = true;
@@ -401,6 +422,82 @@ const handleWheel = (event: WheelEvent) => {
     setTimeout(() => {
       isManualScrolling.value = false;
     }, 10); // Reduced to 10ms for maximum responsiveness
+  }
+};
+
+// Handle touch events for mobile manual scrolling
+const handleTouchStart = (event: TouchEvent) => {
+  if (!autoplay.value && !isModalOpen.value) {
+    // Check if touch is on controls area - if so, don't handle for scrolling
+    const target = event.target as HTMLElement;
+    const isControlsArea =
+      target.closest(".control-panel") || target.closest("[data-controls]");
+
+    if (!isControlsArea) {
+      isTouching.value = true;
+      touchStartY.value = event.touches[0].clientY;
+      touchStartX.value = event.touches[0].clientX;
+      touchStartTime.value = Date.now();
+      touchMoved.value = false;
+    }
+  }
+};
+
+const handleTouchMove = (event: TouchEvent) => {
+  if (!autoplay.value && !isModalOpen.value && isTouching.value) {
+    const currentY = event.touches[0].clientY;
+    const currentX = event.touches[0].clientX;
+
+    // Calculate movement distance
+    const deltaY = Math.abs(currentY - touchStartY.value);
+    const deltaX = Math.abs(currentX - touchStartX.value);
+    const totalMovement = Math.sqrt(deltaY * deltaY + deltaX * deltaX);
+
+    // If movement is significant, mark as moved and prevent default
+    if (totalMovement > 10) {
+      touchMoved.value = true;
+      event.preventDefault(); // Prevent page scrolling
+    }
+  }
+};
+
+const handleTouchEnd = (event: TouchEvent) => {
+  if (!autoplay.value && !isModalOpen.value && isTouching.value) {
+    const touchEndY = event.changedTouches[0].clientY;
+    const touchEndTime = Date.now();
+
+    const deltaY = touchStartY.value - touchEndY;
+    const deltaTime = touchEndTime - touchStartTime.value;
+
+    // If this was a significant movement, treat as scroll gesture
+    if (touchMoved.value) {
+      event.preventDefault();
+
+      // Calculate velocity and intensity
+      const distance = Math.abs(deltaY);
+      const velocity = distance / Math.max(deltaTime, 1); // pixels per ms
+
+      // Only trigger if significant movement (> 20px) and reasonable time (< 500ms)
+      if (distance > 20 && deltaTime < 500) {
+        // Calculate scroll intensity based on velocity and distance
+        const baseIntensity = Math.min(distance / 100, 2); // Distance-based intensity
+        const velocityBonus = Math.min(velocity / 2, 1); // Velocity bonus
+        const scrollIntensity = Math.max(baseIntensity + velocityBonus, 0.5);
+
+        // Determine direction (opposite of touch movement for natural feel)
+        const direction = deltaY > 0 ? "forward" : "reverse";
+
+        manualScroll(direction, scrollIntensity);
+      }
+    }
+    // If no significant movement, this was a tap - let click events handle it
+
+    // Reset touch state
+    isTouching.value = false;
+    touchStartY.value = 0;
+    touchStartX.value = 0;
+    touchStartTime.value = 0;
+    touchMoved.value = false;
   }
 };
 
@@ -753,6 +850,14 @@ onMounted(async () => {
   window.addEventListener("keydown", handleKeydown);
   window.addEventListener("wheel", handleWheel, { passive: false });
 
+  // Add touch event listeners for mobile support
+  window.addEventListener("touchstart", handleTouchStart, { passive: false });
+  window.addEventListener("touchmove", handleTouchMove, { passive: false });
+  window.addEventListener("touchend", handleTouchEnd, { passive: false });
+
+  // Add click outside to close controls
+  document.addEventListener("click", handleDocumentClick);
+
   await nextTick();
 
   // Use the proper initialization system instead of forcing it
@@ -772,6 +877,15 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("wheel", handleWheel);
+
+  // Remove touch event listeners
+  window.removeEventListener("touchstart", handleTouchStart);
+  window.removeEventListener("touchmove", handleTouchMove);
+  window.removeEventListener("touchend", handleTouchEnd);
+
+  // Remove click outside listener
+  document.removeEventListener("click", handleDocumentClick);
+
   if (animationId.value) {
     cancelAnimationFrame(animationId.value);
   }
@@ -799,7 +913,8 @@ onUnmounted(() => {
     <!-- Control Toggle Button -->
     <button
       @click="toggleControls"
-      class="fixed bottom-6 left-6 z-50 p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all duration-300 shadow-lg"
+      data-controls
+      class="fixed bottom-6 left-6 z-50 p-4 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all duration-300 shadow-lg min-w-[56px] min-h-[56px] flex items-center justify-center"
       :class="{ 'bg-blue-600/80 hover:bg-blue-600': showControls }"
     >
       <svg
@@ -829,7 +944,7 @@ onUnmounted(() => {
         <h3 class="text-white font-semibold">Controls</h3>
         <button
           @click="toggleControls"
-          class="text-gray-400 hover:text-white transition-colors p-1"
+          class="text-gray-400 hover:text-white transition-colors p-3 -m-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <svg
             class="w-5 h-5"
