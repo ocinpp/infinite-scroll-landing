@@ -1148,11 +1148,11 @@ onUnmounted(() => {
             </div>
 
             <!-- Container indicator -->
-            <div
+            <!-- <div
               class="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded"
             >
               Layer {{ containerIndex }}
-            </div>
+            </div> -->
           </div>
         </div>
       </div>
