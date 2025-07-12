@@ -894,7 +894,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="min-h-[100dvh] relative overflow-hidden bg-gradient-to-br from-gray-900 via-black to-gray-900"
+    class="max-h-dvh h-dvh relative overflow-hidden bg-gradient-to-br from-gray-900 via-black to-gray-900"
   >
     <!-- Header - Transparent overlay that content can go under -->
     <header
@@ -1092,7 +1092,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Gallery Container - Maximum page fill, content can go under header -->
-    <div class="w-full h-[100dvh] flex flex-col">
+    <div class="w-full h-dvh flex flex-col">
       <!-- Multiple Scrolling Gallery Containers -->
       <div
         v-for="containerIndex in visibleContainerIndices"
