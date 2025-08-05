@@ -6,14 +6,16 @@ A sophisticated infinite scrolling image gallery built with Vue 3, TypeScript, a
 
 ### 🎨 Visual Design
 - **Multi-layer infinite scrolling** with alternating directions
-- **Responsive card layouts** that adapt to layer count
+- **Dual orientation support** - horizontal and vertical scrolling modes
+- **Responsive card layouts** that adapt to layer count and scroll direction
 - **Smooth animations** with configurable speed and direction
 - **Modal image viewer** with navigation controls
-- **Tilt effects** for visual depth
+- **Tilt effects** for visual depth (works in both orientations)
 - **Customizable spacing** between layers
 - **Intelligent image distribution** - all layers show complete image set in different orders
 
 ### 🎮 Interactive Controls
+- **Scroll direction toggle** - switch between horizontal and vertical scrolling
 - **Autoplay toggle** with forward/reverse direction
 - **Manual scroll** with momentum-based deceleration
 - **Hover to pause** functionality
@@ -33,6 +35,7 @@ A sophisticated infinite scrolling image gallery built with Vue 3, TypeScript, a
 ### 🔧 Technical Features
 - **Type-safe TypeScript** implementation
 - **Reactive Vue 3 Composition API**
+- **Prop-based architecture** - images passed as props for maximum flexibility
 - **Efficient animation loops** with requestAnimationFrame
 - **Automatic container registration** and initialization
 - **Robust error handling** and state management
@@ -88,24 +91,42 @@ The gallery automatically initializes with default settings:
 
 ### Controls
 - **Toggle Controls**: Click the gear icon (bottom-left) to show/hide controls
+- **Scroll Direction**: Switch between horizontal and vertical scrolling modes
 - **Autoplay**: Toggle automatic scrolling on/off
 - **Direction**: Switch between forward/reverse scrolling
 - **Speed**: Adjust animation speed (5-100)
 - **Layers**: Change number of scrolling layers (1-5)
-- **Spacing**: Adjust vertical spacing between layers (0-20rem)
+- **Spacing**: Adjust spacing between layers (0-20rem)
+- **Tilt Angle**: Adjust container tilt (0-45°)
+- **Tilt Direction**: Switch tilt between left and right
 - **Pause on Hover**: Enable/disable hover pause functionality
+
+### Scroll Orientations
+
+#### Horizontal Mode (Default)
+- **Layout**: Cards arranged horizontally in rows
+- **Movement**: Layers scroll left/right with alternating directions
+- **Spacing**: Vertical spacing between layers
+- **Cards**: Optimized for landscape viewing
+
+#### Vertical Mode
+- **Layout**: Cards arranged vertically in columns
+- **Movement**: Layers scroll up/down with alternating directions
+- **Spacing**: Horizontal spacing between layers
+- **Cards**: Wider cards optimized for portrait stacking
+- **Tilt**: Works seamlessly with vertical orientation
 
 ### Manual Scrolling
 When autoplay is disabled:
 
 #### Desktop
-- **Mouse wheel**: Scroll up/down to move gallery
+- **Mouse wheel**: Scroll up/down to move gallery (works in both orientations)
 - **Trackpad**: Use two-finger scroll gestures
 - **Momentum**: Multiple rapid scrolls build momentum for longer gliding
 
 #### Mobile
 - **Smart gesture detection**: Tap to open modal, swipe to scroll
-- **Touch swipes**: Swipe up/down anywhere to move gallery
+- **Touch swipes**: Swipe up/down anywhere to move gallery (works in both orientations)
 - **Velocity detection**: Faster swipes create more momentum
 - **Natural feel**: Touch direction matches scroll direction
 - **Easy access**: Swipe works on images, cards, and background areas
@@ -114,6 +135,7 @@ When autoplay is disabled:
 - **Momentum building**: Multiple rapid inputs build momentum for longer gliding
 - **Deceleration**: Smooth gradual slowdown instead of abrupt stopping
 - **Synchronized movement**: All layers move together perfectly
+- **Orientation aware**: Same controls work for both horizontal and vertical modes
 
 ### Image Modal
 - **Click any image** to open in modal view
@@ -121,6 +143,39 @@ When autoplay is disabled:
 - **Close**: Click X, press Escape, or click outside modal
 
 ## 🖼️ Image Management
+
+### Component Usage
+The `InfiniteScrollGallery` component accepts images as a prop for maximum flexibility:
+
+```vue
+<template>
+  <InfiniteScrollGallery :images="myImages" />
+</template>
+
+<script setup lang="ts">
+import InfiniteScrollGallery from './components/InfiniteScrollGallery.vue'
+import type { ImageItem } from './types/images'
+
+// Images can come from any source
+const myImages: ImageItem[] = [
+  {
+    id: 1,
+    url: "https://example.com/image.jpg",
+    title: "Image Title",
+    description: "Image description text"
+  }
+  // ... more images
+]
+
+// Or from an API
+const apiImages = await fetch('/api/images').then(r => r.json())
+
+// Or conditionally
+const galleryImages = computed(() =>
+  showNature.value ? natureImages : cityImages
+)
+</script>
+```
 
 ### Image Data Structure
 Images are stored in `src/data/images.json` for easy maintenance:
@@ -232,12 +287,15 @@ src/
 
 ### Default Settings
 ```typescript
-const autoplay = ref(true);              // Auto-scrolling enabled
-const autoplayDirection = ref("forward"); // Scroll direction
-const pauseOnHover = ref(true);          // Pause on mouse hover
-const scrollSpeed = ref(20);             // Animation speed (5-100)
-const numberOfContainers = ref(3);       // Number of layers (1-5)
-const layerSpacing = ref(1);             // Spacing between layers (0-20rem)
+const scrollDirection = ref("horizontal"); // Scroll orientation (horizontal/vertical)
+const autoplay = ref(true);               // Auto-scrolling enabled
+const autoplayDirection = ref("forward");  // Scroll direction (forward/reverse)
+const pauseOnHover = ref(true);           // Pause on mouse hover
+const scrollSpeed = ref(20);              // Animation speed (1-50)
+const numberOfContainers = ref(3);        // Number of layers (1-5)
+const layerSpacing = ref(14);             // Spacing between layers (0-20rem)
+const tiltDegree = ref(15);               // Tilt angle (0-45°)
+const tiltDirection = ref("right");       // Tilt direction (left/right)
 ```
 
 ### Customization
