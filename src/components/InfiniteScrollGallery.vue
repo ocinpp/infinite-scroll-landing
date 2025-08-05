@@ -16,6 +16,7 @@ const pauseOnHover = ref(true);
 const scrollSpeed = ref(20);
 const numberOfContainers = ref(3);
 const layerSpacing = ref(14); // NEW: Spacing between layers in rem
+const scrollDirection = ref<"horizontal" | "vertical">("horizontal"); // NEW: Scroll direction
 const selectedImage = ref<ImageItem | null>(null);
 const isModalOpen = ref(false);
 const isPaused = ref(false);
@@ -81,25 +82,61 @@ const containerTiltStyle = computed(() => {
   };
 });
 
-// Stable card sizing based on number of containers
+// Stable card sizing based on number of containers and scroll direction
 const cardSizeClasses = computed(() => {
   let sizeClass = "";
-  if (numberOfContainers.value >= 4) {
-    sizeClass = "w-64 h-72";
-  } else if (numberOfContainers.value === 3) {
-    sizeClass = "w-72 h-80";
+  if (scrollDirection.value === "vertical") {
+    // For vertical scrolling, use wider cards that work well stacked
+    if (numberOfContainers.value >= 4) {
+      sizeClass = "w-80 h-56";
+    } else if (numberOfContainers.value === 3) {
+      sizeClass = "w-96 h-64";
+    } else {
+      sizeClass = "w-[28rem] h-72";
+    }
   } else {
-    sizeClass = "w-80 h-96";
+    // Original horizontal sizing
+    if (numberOfContainers.value >= 4) {
+      sizeClass = "w-64 h-72";
+    } else if (numberOfContainers.value === 3) {
+      sizeClass = "w-72 h-80";
+    } else {
+      sizeClass = "w-80 h-96";
+    }
   }
 
   console.log(
-    `🎨 Card size updated: ${sizeClass} (containers: ${numberOfContainers.value})`
+    `🎨 Card size updated: ${sizeClass} (containers: ${numberOfContainers.value}, direction: ${scrollDirection.value})`
   );
   return sizeClass;
 });
 
+// Layout classes for containers based on scroll direction
+const containerLayoutClasses = computed(() => {
+  if (scrollDirection.value === "vertical") {
+    return "flex flex-col justify-center items-center";
+  } else {
+    return "flex items-center";
+  }
+});
+
+// Layout classes for card containers based on scroll direction
+const cardContainerLayoutClasses = computed(() => {
+  if (scrollDirection.value === "vertical") {
+    return "flex flex-col gap-6 will-change-transform";
+  } else {
+    return "flex gap-6 will-change-transform";
+  }
+});
+
 // Calculate container height to fill the page maximally, accounting for spacing
 const containerHeight = computed(() => {
+  if (scrollDirection.value === "vertical") {
+    // For vertical scrolling, use full width and distribute height
+    return 100; // Full viewport height divided by containers
+  }
+
+  // Original horizontal logic
   // Calculate total spacing needed between containers
   const totalSpacingRem = (numberOfContainers.value - 1) * layerSpacing.value;
 
@@ -123,6 +160,26 @@ const containerHeight = computed(() => {
   );
 
   return finalHeight;
+});
+
+// Calculate container width for vertical scrolling
+const containerWidth = computed(() => {
+  if (scrollDirection.value === "horizontal") {
+    return 100; // Full width for horizontal
+  }
+
+  // For vertical scrolling, distribute width among containers
+  const totalSpacingRem = (numberOfContainers.value - 1) * layerSpacing.value;
+  const totalSpacingVw = totalSpacingRem * 1.5; // Convert rem to vw approximation
+  const availableWidth = Math.max(100 - totalSpacingVw, 20); // Minimum 20vw available
+  const baseWidth = availableWidth / numberOfContainers.value;
+  const finalWidth = Math.max(baseWidth, 15); // Minimum 15vw per container
+
+  console.log(
+    `📏 Container width: ${finalWidth}vw (spacing: ${layerSpacing.value}rem, containers: ${numberOfContainers.value})`
+  );
+
+  return finalWidth;
 });
 
 // Create different image sets for each container - same images, different order
@@ -173,21 +230,36 @@ const registerContainer = (el: HTMLElement | null, index: number) => {
     ) {
       // Wait for element to have content, then set position
       setTimeout(() => {
-        const width = el.scrollWidth || 2400; // fallback width
-        initialPosition = -width / 3;
-        scrollPositions.value[arrayIndex] = initialPosition;
-        el.style.transform = `translateX(${initialPosition}px)`;
-        console.log(
-          `✅ Container ${index} initialized at ${initialPosition}px`
-        );
+        if (scrollDirection.value === "vertical") {
+          const height = el.scrollHeight || 2400; // fallback height for vertical
+          initialPosition = -height / 3;
+          scrollPositions.value[arrayIndex] = initialPosition;
+          el.style.transform = `translateY(${initialPosition}px)`;
+          console.log(
+            `✅ Container ${index} (vertical) initialized at ${initialPosition}px`
+          );
+        } else {
+          const width = el.scrollWidth || 2400; // fallback width for horizontal
+          initialPosition = -width / 3;
+          scrollPositions.value[arrayIndex] = initialPosition;
+          el.style.transform = `translateX(${initialPosition}px)`;
+          console.log(
+            `✅ Container ${index} (horizontal) initialized at ${initialPosition}px`
+          );
+        }
 
         // Check if all containers are ready
         checkIfAllReady();
       }, 100);
     } else {
       scrollPositions.value[arrayIndex] = 0;
-      el.style.transform = `translateX(0px)`;
-      console.log(`✅ Container ${index} initialized at 0px`);
+      if (scrollDirection.value === "vertical") {
+        el.style.transform = `translateY(0px)`;
+        console.log(`✅ Container ${index} (vertical) initialized at 0px`);
+      } else {
+        el.style.transform = `translateX(0px)`;
+        console.log(`✅ Container ${index} (horizontal) initialized at 0px`);
+      }
       checkIfAllReady();
     }
   }
@@ -456,7 +528,12 @@ const animateMomentum = () => {
   // Apply the same momentum to all containers synchronously
   for (let index = 0; index < numberOfContainers.value; index++) {
     const container = scrollContainers.value[index];
-    if (!container || container.scrollWidth === 0) continue;
+    const containerSize =
+      scrollDirection.value === "vertical"
+        ? container?.scrollHeight || 0
+        : container?.scrollWidth || 0;
+
+    if (!container || containerSize === 0) continue;
 
     // Determine direction for each container (same logic as manual scroll)
     const isEvenContainer = index % 2 === 0;
@@ -467,19 +544,23 @@ const animateMomentum = () => {
     scrollPositions.value[index] += globalMomentum.value * actualDirection;
 
     // Handle wrapping
-    const containerWidth = container.scrollWidth / 3;
+    const containerBoundary = containerSize / 3;
     if (actualDirection < 0) {
-      if (scrollPositions.value[index] <= -containerWidth) {
+      if (scrollPositions.value[index] <= -containerBoundary) {
         scrollPositions.value[index] = 0;
       }
     } else {
       if (scrollPositions.value[index] >= 0) {
-        scrollPositions.value[index] = -containerWidth;
+        scrollPositions.value[index] = -containerBoundary;
       }
     }
 
-    // Apply position immediately
-    container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+    // Apply position immediately with correct transform
+    if (scrollDirection.value === "vertical") {
+      container.style.transform = `translateY(${scrollPositions.value[index]}px)`;
+    } else {
+      container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+    }
   }
 
   // Gradually reduce momentum (smooth deceleration)
@@ -511,39 +592,56 @@ const animate = () => {
       continue;
     }
 
-    // If container has no scrollWidth, try to use fallback calculation
-    if (container.scrollWidth === 0) {
-      // Use fallback width calculation for animation
-      const cardWidth =
-        numberOfContainers.value >= 4
+    // Check container size based on scroll direction
+    const containerSize =
+      scrollDirection.value === "vertical"
+        ? container.scrollHeight
+        : container.scrollWidth;
+
+    // If container has no size, try to use fallback calculation
+    if (containerSize === 0) {
+      // Use fallback size calculation for animation
+      const cardSize =
+        scrollDirection.value === "vertical"
+          ? numberOfContainers.value >= 4
+            ? 224
+            : numberOfContainers.value === 3
+            ? 256
+            : 288 // height
+          : numberOfContainers.value >= 4
           ? 256
           : numberOfContainers.value === 3
           ? 288
-          : 320;
+          : 320; // width
       const gap = 24;
       const cardsPerSet = 8;
-      const fallbackWidth = (cardWidth + gap) * cardsPerSet * 3;
+      const fallbackSize = (cardSize + gap) * cardsPerSet * 3;
 
-      // Use fallback width for animation calculations
+      // Use fallback size for animation calculations
       const isEvenContainer = index % 2 === 0;
       const baseDirection = autoplayDirection.value === "forward" ? -1 : 1;
       const direction = isEvenContainer ? baseDirection : -baseDirection;
 
       scrollPositions.value[index] += actualSpeed * direction;
 
-      const containerWidth = fallbackWidth / 3;
+      const containerBoundary = fallbackSize / 3;
 
       if (direction < 0) {
-        if (scrollPositions.value[index] <= -containerWidth) {
+        if (scrollPositions.value[index] <= -containerBoundary) {
           scrollPositions.value[index] = 0;
         }
       } else {
         if (scrollPositions.value[index] >= 0) {
-          scrollPositions.value[index] = -containerWidth;
+          scrollPositions.value[index] = -containerBoundary;
         }
       }
 
-      container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+      // Apply correct transform based on scroll direction
+      if (scrollDirection.value === "vertical") {
+        container.style.transform = `translateY(${scrollPositions.value[index]}px)`;
+      } else {
+        container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+      }
       continue;
     }
 
@@ -554,20 +652,25 @@ const animate = () => {
 
     scrollPositions.value[index] += actualSpeed * direction;
 
-    // Get container width to calculate when to reset
-    const containerWidth = container.scrollWidth / 3;
+    // Get container boundary to calculate when to reset
+    const containerBoundary = containerSize / 3;
 
     if (direction < 0) {
-      if (scrollPositions.value[index] <= -containerWidth) {
+      if (scrollPositions.value[index] <= -containerBoundary) {
         scrollPositions.value[index] = 0;
       }
     } else {
       if (scrollPositions.value[index] >= 0) {
-        scrollPositions.value[index] = -containerWidth;
+        scrollPositions.value[index] = -containerBoundary;
       }
     }
 
-    container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+    // Apply correct transform based on scroll direction
+    if (scrollDirection.value === "vertical") {
+      container.style.transform = `translateY(${scrollPositions.value[index]}px)`;
+    } else {
+      container.style.transform = `translateX(${scrollPositions.value[index]}px)`;
+    }
   }
 
   animationId.value = requestAnimationFrame(animate);
@@ -631,7 +734,12 @@ const resetScrollSystem = async () => {
         }
       });
 
-      if (!containerImagesLoaded || container.scrollWidth === 0) {
+      const containerSize =
+        scrollDirection.value === "vertical"
+          ? container.scrollHeight
+          : container.scrollWidth;
+
+      if (!containerImagesLoaded || containerSize === 0) {
         allLoaded = false;
         break;
       }
@@ -680,6 +788,39 @@ watch(numberOfContainers, async (newValue, oldValue) => {
   // Give containers time to register and check readiness
   setTimeout(() => {
     console.log(`🔍 Checking if all ${newValue} containers are ready...`);
+    checkIfAllReady();
+  }, 500);
+});
+
+// Watcher for scroll direction changes
+watch(scrollDirection, async (newValue, oldValue) => {
+  console.log(`🔄 Scroll direction changed: ${oldValue} → ${newValue}`);
+
+  // Stop animation
+  stopAnimation();
+
+  // Clear all container references and positions
+  scrollContainers.value = Array(MAX_CONTAINERS).fill(null);
+  scrollPositions.value = Array(MAX_CONTAINERS).fill(0);
+
+  // Stop and clear momentum
+  stopMomentum();
+
+  // Reset initialization state
+  isInitialized.value = false;
+
+  // Wait for DOM update
+  await nextTick();
+
+  console.log(
+    `🔄 Waiting for containers to register with ${newValue} direction...`
+  );
+
+  // Give containers time to register and check readiness
+  setTimeout(() => {
+    console.log(
+      `🔍 Checking if all containers are ready for ${newValue} scrolling...`
+    );
     checkIfAllReady();
   }, 500);
 
@@ -849,20 +990,20 @@ onUnmounted(() => {
 
     <!-- Control Panel -->
     <div
-      class="control-panel fixed bottom-20 left-6 z-99 p-4 rounded-lg shadow-2xl w-80 max-w-[calc(100vw-2rem)] transition-all duration-300 transform"
+      class="control-panel fixed bottom-20 left-6 z-99 p-3 rounded-lg shadow-2xl w-72 max-w-[calc(100vw-2rem)] transition-all duration-300 transform bg-black/85 backdrop-blur-md border border-white/20"
       :class="{
         'translate-y-0 opacity-100': showControls,
         'translate-y-full opacity-0 pointer-events-none': !showControls,
       }"
     >
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-white font-semibold">Controls</h3>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-white font-medium text-sm">Controls</h3>
         <button
           @click="toggleControls"
-          class="text-gray-400 hover:text-white transition-colors p-3 -m-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+          class="text-gray-400 hover:text-white transition-colors p-2 -m-1 min-w-[32px] min-h-[32px] flex items-center justify-center"
         >
           <svg
-            class="w-5 h-5"
+            class="w-4 h-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -877,10 +1018,10 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div class="space-y-4">
+      <div class="space-y-3">
         <!-- Number of Containers -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
+          <label class="block text-xs text-gray-300 mb-1"
             >Scroll Layers: {{ numberOfContainers }}</label
           >
           <input
@@ -888,18 +1029,32 @@ onUnmounted(() => {
             type="range"
             min="1"
             max="5"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
-          <div class="flex justify-between text-xs text-gray-400 mt-1">
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
             <span>1</span>
             <span>5</span>
           </div>
         </div>
 
+        <!-- Scroll Direction -->
+        <div>
+          <label class="block text-xs text-gray-300 mb-1"
+            >Scroll Direction</label
+          >
+          <select
+            v-model="scrollDirection"
+            class="w-full p-1.5 bg-gray-700 border border-gray-600 rounded text-white text-xs"
+          >
+            <option value="horizontal">Horizontal</option>
+            <option value="vertical">Vertical</option>
+          </select>
+        </div>
+
         <!-- NEW: Spacing Between Layers -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
-            >Spacing Between Layers: {{ layerSpacing }}rem</label
+          <label class="block text-xs text-gray-300 mb-1"
+            >Layer Spacing: {{ layerSpacing }}rem</label
           >
           <input
             v-model.number="layerSpacing"
@@ -907,34 +1062,38 @@ onUnmounted(() => {
             min="0"
             max="20"
             step="0.1"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
-          <div class="flex justify-between text-xs text-gray-400 mt-1">
-            <span>0rem (Overlap)</span>
-            <span>20rem (Very Wide)</span>
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
+            <span>0</span>
+            <span>20</span>
           </div>
         </div>
 
         <!-- Tilt Degree -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
-            >Tilt Degree: {{ tiltDegree }}°</label
+          <label class="block text-xs text-gray-300 mb-1"
+            >Tilt Angle: {{ tiltDegree }}°</label
           >
           <input
-            v-model="tiltDegree"
+            v-model.number="tiltDegree"
             type="range"
             min="0"
             max="45"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
+            <span>0°</span>
+            <span>45°</span>
+          </div>
         </div>
 
         <!-- Tilt Direction -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2">Tilt Direction</label>
+          <label class="block text-xs text-gray-300 mb-1">Tilt Direction</label>
           <select
             v-model="tiltDirection"
-            class="w-full p-2 bg-gray-700 text-white rounded border border-gray-600"
+            class="w-full p-1.5 bg-gray-700 text-white rounded border border-gray-600 text-xs"
           >
             <option value="left">Left</option>
             <option value="right">Right</option>
@@ -944,34 +1103,31 @@ onUnmounted(() => {
         <!-- Autoplay -->
         <div>
           <label class="flex items-center cursor-pointer">
-            <input v-model="autoplay" type="checkbox" class="mr-2" />
-            <span class="text-sm text-gray-300">Autoplay</span>
+            <input v-model="autoplay" type="checkbox" class="mr-2 scale-75" />
+            <span class="text-xs text-gray-300">Autoplay</span>
           </label>
           <div
             v-if="!autoplay"
-            class="mt-2 p-2 bg-blue-900/20 rounded border border-blue-700/30"
+            class="mt-1 p-1.5 bg-blue-900/20 rounded border border-blue-700/30"
           >
             <p class="text-xs text-blue-300">
-              💡 Smooth manual scroll enabled: Use mouse wheel or trackpad to
-              control movement
+              💡 Manual scroll: Use wheel/trackpad
             </p>
           </div>
           <div
             v-if="!isInitialized"
-            class="mt-2 p-2 bg-yellow-900/20 rounded border border-yellow-700/30"
+            class="mt-1 p-1.5 bg-yellow-900/20 rounded border border-yellow-700/30"
           >
-            <p class="text-xs text-yellow-300">
-              ⏳ Loading containers... Please wait
-            </p>
+            <p class="text-xs text-yellow-300">⏳ Loading...</p>
           </div>
         </div>
 
         <!-- Autoplay Direction -->
         <div v-if="autoplay">
-          <label class="block text-sm text-gray-300 mb-2">Direction</label>
+          <label class="block text-xs text-gray-300 mb-1">Direction</label>
           <select
             v-model="autoplayDirection"
-            class="w-full p-2 bg-gray-700 text-white rounded border border-gray-600"
+            class="w-full p-1.5 bg-gray-700 text-white rounded border border-gray-600 text-xs"
           >
             <option value="forward">Forward</option>
             <option value="reverse">Reverse</option>
@@ -981,14 +1137,18 @@ onUnmounted(() => {
         <!-- Pause on Hover -->
         <div>
           <label class="flex items-center cursor-pointer">
-            <input v-model="pauseOnHover" type="checkbox" class="mr-2" />
-            <span class="text-sm text-gray-300">Pause on Hover</span>
+            <input
+              v-model="pauseOnHover"
+              type="checkbox"
+              class="mr-2 scale-75"
+            />
+            <span class="text-xs text-gray-300">Pause on Hover</span>
           </label>
         </div>
 
         <!-- Speed -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
+          <label class="block text-xs text-gray-300 mb-1"
             >Speed: {{ scrollSpeed }}</label
           >
           <input
@@ -996,9 +1156,9 @@ onUnmounted(() => {
             type="range"
             min="5"
             max="50"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
-          <div class="flex justify-between text-xs text-gray-400 mt-1">
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
             <span>Slow</span>
             <span>Fast</span>
           </div>
@@ -1007,16 +1167,29 @@ onUnmounted(() => {
     </div>
 
     <!-- Gallery Container - Maximum page fill, content can go under header -->
-    <div class="w-full h-dvh flex flex-col">
+    <div
+      class="w-full h-dvh transition-all duration-500 ease-out"
+      :class="
+        scrollDirection === 'vertical' ? 'flex flex-row' : 'flex flex-col'
+      "
+    >
       <!-- Multiple Scrolling Gallery Containers -->
       <div
         v-for="containerIndex in visibleContainerIndices"
         :key="`container-${containerIndex}`"
-        class="flex items-center transition-all duration-500 ease-out will-change-transform flex-shrink-0"
+        class="transition-all duration-500 ease-out will-change-transform flex-shrink-0"
+        :class="containerLayoutClasses"
         :style="{
           ...containerTiltStyle,
-          height: `${containerHeight}dvh`,
-          marginBottom: `${layerSpacing}rem`,
+          ...(scrollDirection === 'vertical'
+            ? {
+                width: `${containerWidth}vw`,
+                marginRight: `${layerSpacing}rem`,
+              }
+            : {
+                height: `${containerHeight}dvh`,
+                marginBottom: `${layerSpacing}rem`,
+              }),
           zIndex: MAX_CONTAINERS - containerIndex + 1,
         }"
         @mouseenter="handleMouseEnter"
@@ -1024,7 +1197,7 @@ onUnmounted(() => {
       >
         <div
           :ref="el => registerContainer(el as HTMLElement, containerIndex)"
-          class="flex gap-6 will-change-transform"
+          :class="cardContainerLayoutClasses"
         >
           <div
             v-for="(image, imageIndex) in getImagesForContainer(
