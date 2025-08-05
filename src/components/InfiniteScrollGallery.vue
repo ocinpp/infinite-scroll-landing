@@ -990,20 +990,20 @@ onUnmounted(() => {
 
     <!-- Control Panel -->
     <div
-      class="control-panel fixed bottom-20 left-6 z-99 p-4 rounded-lg shadow-2xl w-80 max-w-[calc(100vw-2rem)] transition-all duration-300 transform"
+      class="control-panel fixed bottom-20 left-6 z-99 p-3 rounded-lg shadow-2xl w-72 max-w-[calc(100vw-2rem)] transition-all duration-300 transform bg-black/85 backdrop-blur-md border border-white/20"
       :class="{
         'translate-y-0 opacity-100': showControls,
         'translate-y-full opacity-0 pointer-events-none': !showControls,
       }"
     >
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-white font-semibold">Controls</h3>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-white font-medium text-sm">Controls</h3>
         <button
           @click="toggleControls"
-          class="text-gray-400 hover:text-white transition-colors p-3 -m-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+          class="text-gray-400 hover:text-white transition-colors p-2 -m-1 min-w-[32px] min-h-[32px] flex items-center justify-center"
         >
           <svg
-            class="w-5 h-5"
+            class="w-4 h-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -1018,10 +1018,10 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div class="space-y-4">
+      <div class="space-y-3">
         <!-- Number of Containers -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
+          <label class="block text-xs text-gray-300 mb-1"
             >Scroll Layers: {{ numberOfContainers }}</label
           >
           <input
@@ -1029,9 +1029,9 @@ onUnmounted(() => {
             type="range"
             min="1"
             max="5"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
-          <div class="flex justify-between text-xs text-gray-400 mt-1">
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
             <span>1</span>
             <span>5</span>
           </div>
@@ -1039,12 +1039,12 @@ onUnmounted(() => {
 
         <!-- Scroll Direction -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
+          <label class="block text-xs text-gray-300 mb-1"
             >Scroll Direction</label
           >
           <select
             v-model="scrollDirection"
-            class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+            class="w-full p-1.5 bg-gray-700 border border-gray-600 rounded text-white text-xs"
           >
             <option value="horizontal">Horizontal</option>
             <option value="vertical">Vertical</option>
@@ -1053,8 +1053,8 @@ onUnmounted(() => {
 
         <!-- NEW: Spacing Between Layers -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
-            >Spacing Between Layers: {{ layerSpacing }}rem</label
+          <label class="block text-xs text-gray-300 mb-1"
+            >Layer Spacing: {{ layerSpacing }}rem</label
           >
           <input
             v-model.number="layerSpacing"
@@ -1062,34 +1062,38 @@ onUnmounted(() => {
             min="0"
             max="20"
             step="0.1"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
-          <div class="flex justify-between text-xs text-gray-400 mt-1">
-            <span>0rem (Overlap)</span>
-            <span>20rem (Very Wide)</span>
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
+            <span>0</span>
+            <span>20</span>
           </div>
         </div>
 
         <!-- Tilt Degree -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
-            >Tilt Degree: {{ tiltDegree }}°</label
+          <label class="block text-xs text-gray-300 mb-1"
+            >Tilt Angle: {{ tiltDegree }}°</label
           >
           <input
-            v-model="tiltDegree"
+            v-model.number="tiltDegree"
             type="range"
             min="0"
             max="45"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
+            <span>0°</span>
+            <span>45°</span>
+          </div>
         </div>
 
         <!-- Tilt Direction -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2">Tilt Direction</label>
+          <label class="block text-xs text-gray-300 mb-1">Tilt Direction</label>
           <select
             v-model="tiltDirection"
-            class="w-full p-2 bg-gray-700 text-white rounded border border-gray-600"
+            class="w-full p-1.5 bg-gray-700 text-white rounded border border-gray-600 text-xs"
           >
             <option value="left">Left</option>
             <option value="right">Right</option>
@@ -1099,34 +1103,31 @@ onUnmounted(() => {
         <!-- Autoplay -->
         <div>
           <label class="flex items-center cursor-pointer">
-            <input v-model="autoplay" type="checkbox" class="mr-2" />
-            <span class="text-sm text-gray-300">Autoplay</span>
+            <input v-model="autoplay" type="checkbox" class="mr-2 scale-75" />
+            <span class="text-xs text-gray-300">Autoplay</span>
           </label>
           <div
             v-if="!autoplay"
-            class="mt-2 p-2 bg-blue-900/20 rounded border border-blue-700/30"
+            class="mt-1 p-1.5 bg-blue-900/20 rounded border border-blue-700/30"
           >
             <p class="text-xs text-blue-300">
-              💡 Smooth manual scroll enabled: Use mouse wheel or trackpad to
-              control movement
+              💡 Manual scroll: Use wheel/trackpad
             </p>
           </div>
           <div
             v-if="!isInitialized"
-            class="mt-2 p-2 bg-yellow-900/20 rounded border border-yellow-700/30"
+            class="mt-1 p-1.5 bg-yellow-900/20 rounded border border-yellow-700/30"
           >
-            <p class="text-xs text-yellow-300">
-              ⏳ Loading containers... Please wait
-            </p>
+            <p class="text-xs text-yellow-300">⏳ Loading...</p>
           </div>
         </div>
 
         <!-- Autoplay Direction -->
         <div v-if="autoplay">
-          <label class="block text-sm text-gray-300 mb-2">Direction</label>
+          <label class="block text-xs text-gray-300 mb-1">Direction</label>
           <select
             v-model="autoplayDirection"
-            class="w-full p-2 bg-gray-700 text-white rounded border border-gray-600"
+            class="w-full p-1.5 bg-gray-700 text-white rounded border border-gray-600 text-xs"
           >
             <option value="forward">Forward</option>
             <option value="reverse">Reverse</option>
@@ -1136,14 +1137,18 @@ onUnmounted(() => {
         <!-- Pause on Hover -->
         <div>
           <label class="flex items-center cursor-pointer">
-            <input v-model="pauseOnHover" type="checkbox" class="mr-2" />
-            <span class="text-sm text-gray-300">Pause on Hover</span>
+            <input
+              v-model="pauseOnHover"
+              type="checkbox"
+              class="mr-2 scale-75"
+            />
+            <span class="text-xs text-gray-300">Pause on Hover</span>
           </label>
         </div>
 
         <!-- Speed -->
         <div>
-          <label class="block text-sm text-gray-300 mb-2"
+          <label class="block text-xs text-gray-300 mb-1"
             >Speed: {{ scrollSpeed }}</label
           >
           <input
@@ -1151,9 +1156,9 @@ onUnmounted(() => {
             type="range"
             min="5"
             max="50"
-            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+            class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
-          <div class="flex justify-between text-xs text-gray-400 mt-1">
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
             <span>Slow</span>
             <span>Fast</span>
           </div>
