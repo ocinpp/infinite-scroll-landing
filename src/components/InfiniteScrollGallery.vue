@@ -1,105 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import ImageModal from "./ImageModal.vue";
+import imageData from "../data/images.json";
+import type { ImageItem } from "../types/images";
 
-interface ImageItem {
-  id: number;
-  url: string;
-  title: string;
-  description: string;
-}
-
-// Sample images from Pexels with working URLs
-const images: ImageItem[] = [
-  {
-    id: 1,
-    url: "https://images.pexels.com/photos/417074/pexels-photo-417074.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Mountain Landscape",
-    description:
-      "Breathtaking mountain views with perfect lighting and stunning natural beauty that captures the essence of wilderness.",
-  },
-  {
-    id: 2,
-    url: "https://images.pexels.com/photos/1029604/pexels-photo-1029604.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Ocean Waves",
-    description:
-      "Powerful waves crashing against the shore with incredible force and mesmerizing patterns of foam and water.",
-  },
-  {
-    id: 3,
-    url: "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Forest Path",
-    description:
-      "Mysterious forest path leading into the unknown depths of nature, surrounded by ancient trees and dappled sunlight.",
-  },
-  {
-    id: 4,
-    url: "https://images.pexels.com/photos/378570/pexels-photo-378570.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "City Lights",
-    description:
-      "Urban nightscape with vibrant city lights creating a spectacular display of modern civilization and energy.",
-  },
-  {
-    id: 5,
-    url: "https://images.pexels.com/photos/1624496/pexels-photo-1624496.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Desert Dunes",
-    description:
-      "Golden sand dunes stretching to the horizon under an endless sky, showcasing the raw beauty of desert landscapes.",
-  },
-  {
-    id: 6,
-    url: "https://images.pexels.com/photos/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Arctic Ice",
-    description:
-      "Pristine arctic landscape with crystalline ice formations that reflect the pure essence of untouched wilderness.",
-  },
-  {
-    id: 7,
-    url: "https://images.pexels.com/photos/1323550/pexels-photo-1323550.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Sunset Beach",
-    description:
-      "Beautiful sunset over calm waters with warm colors painting the sky in magnificent hues of orange and pink.",
-  },
-  {
-    id: 8,
-    url: "https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Urban Architecture",
-    description:
-      "Modern architectural masterpiece showcasing innovative design and the perfect blend of form and function.",
-  },
-];
-
-// Additional images for variety in different containers
-const additionalImages: ImageItem[] = [
-  {
-    id: 9,
-    url: "https://images.pexels.com/photos/1287145/pexels-photo-1287145.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Tropical Paradise",
-    description:
-      "Crystal clear waters and pristine beaches that define the perfect tropical getaway destination.",
-  },
-  {
-    id: 10,
-    url: "https://images.pexels.com/photos/1761279/pexels-photo-1761279.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Urban Skyline",
-    description:
-      "Magnificent city skyline showcasing modern architecture and urban development at its finest.",
-  },
-  {
-    id: 11,
-    url: "https://images.pexels.com/photos/1450353/pexels-photo-1450353.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Autumn Forest",
-    description:
-      "Golden autumn leaves creating a magical carpet through the peaceful forest pathway.",
-  },
-  {
-    id: 12,
-    url: "https://images.pexels.com/photos/1563356/pexels-photo-1563356.jpeg?auto=compress&cs=tinysrgb&w=400",
-    title: "Starry Night",
-    description:
-      "Breathtaking night sky filled with countless stars over a serene landscape.",
-  },
-];
+// Load images from external JSON file for easy maintenance
+const allImages: ImageItem[] = (imageData as any).images;
 
 // Reactive state
 const tiltDegree = ref(15);
@@ -219,14 +125,23 @@ const containerHeight = computed(() => {
   return finalHeight;
 });
 
-// Create different image sets for each container
+// Create different image sets for each container - same images, different order
 const getImagesForContainer = (containerIndex: number) => {
-  const allImages = [...images, ...additionalImages];
-  const startIndex = (containerIndex * 4) % allImages.length;
-  const containerImages = [];
+  // Create a copy of all images to avoid mutating the original array
+  const containerImages = [...allImages];
 
-  for (let i = 0; i < 8; i++) {
-    containerImages.push(allImages[(startIndex + i) % allImages.length]);
+  // Create a deterministic but different shuffle for each container
+  // Using container index as seed for consistent results
+  const seed = containerIndex + 1;
+
+  // Simple deterministic shuffle based on container index
+  for (let i = containerImages.length - 1; i > 0; i--) {
+    // Use container-specific pseudo-random index
+    const j = (seed * i * 7 + containerIndex * 13) % (i + 1);
+    [containerImages[i], containerImages[j]] = [
+      containerImages[j],
+      containerImages[i],
+    ];
   }
 
   // Triple for seamless scrolling
