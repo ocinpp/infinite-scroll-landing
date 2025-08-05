@@ -1,11 +1,25 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import ImageModal from "./ImageModal.vue";
-import imageData from "../data/images.json";
 import type { ImageItem } from "../types/images";
 
-// Load images from external JSON file for easy maintenance
-const allImages: ImageItem[] = (imageData as any).images;
+// Props
+interface Props {
+  /**
+   * Array of images to display in the infinite scroll gallery
+   * @example
+   * const images = [
+   *   { id: 1, url: 'image1.jpg', title: 'Title', description: 'Description' },
+   *   { id: 2, url: 'image2.jpg', title: 'Title', description: 'Description' }
+   * ]
+   */
+  images: ImageItem[];
+}
+
+const props = defineProps<Props>();
+
+// Use images from props
+const allImages = computed(() => props.images);
 
 // Reactive state
 const tiltDegree = ref(15);
@@ -185,7 +199,7 @@ const containerWidth = computed(() => {
 // Create different image sets for each container - same images, different order
 const getImagesForContainer = (containerIndex: number) => {
   // Create a copy of all images to avoid mutating the original array
-  const containerImages = [...allImages];
+  const containerImages = [...allImages.value];
 
   // Create a deterministic but different shuffle for each container
   // Using container index as seed for consistent results
