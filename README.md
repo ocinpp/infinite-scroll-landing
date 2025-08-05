@@ -11,6 +11,7 @@ A sophisticated infinite scrolling image gallery built with Vue 3, TypeScript, a
 - **Modal image viewer** with navigation controls
 - **Tilt effects** for visual depth
 - **Customizable spacing** between layers
+- **Intelligent image distribution** - all layers show complete image set in different orders
 
 ### 🎮 Interactive Controls
 - **Autoplay toggle** with forward/reverse direction
@@ -36,6 +37,8 @@ A sophisticated infinite scrolling image gallery built with Vue 3, TypeScript, a
 - **Automatic container registration** and initialization
 - **Robust error handling** and state management
 - **Hot module replacement** for development
+- **External image data management** with JSON configuration
+- **Deterministic shuffling** for consistent variety across layers
 
 ## 🚀 Quick Start
 
@@ -117,6 +120,36 @@ When autoplay is disabled:
 - **Navigation**: Use arrow buttons or keyboard arrows
 - **Close**: Click X, press Escape, or click outside modal
 
+## 🖼️ Image Management
+
+### Image Data Structure
+Images are stored in `src/data/images.json` for easy maintenance:
+
+```json
+{
+  "images": [
+    {
+      "id": 1,
+      "url": "https://example.com/image.jpg",
+      "title": "Image Title",
+      "description": "Image description text"
+    }
+  ]
+}
+```
+
+### Adding/Editing Images
+1. **Edit** `src/data/images.json`
+2. **Add new images** to the `images` array
+3. **Update existing images** by modifying their properties
+4. **Remove images** by deleting entries from the array
+
+### Image Distribution
+- **All containers show the same complete set** of images
+- **Different shuffled orders** for visual variety across layers
+- **Deterministic shuffling** ensures consistent patterns
+- **Seamless infinite scrolling** with tripled image sets
+
 ## 🧪 Testing
 
 The project includes comprehensive testing scripts in the `testing/` folder:
@@ -161,7 +194,13 @@ testing/
 ```
 src/
 ├── components/
-│   └── InfiniteScrollGallery.vue    # Main gallery component
+│   ├── InfiniteScrollGallery.vue    # Main gallery component
+│   └── ImageModal.vue               # Modal component for image viewing
+├── data/
+│   └── images.json                  # Image data (URLs, titles, descriptions)
+├── types/
+│   ├── images.d.ts                  # TypeScript interfaces for image data
+│   └── json.d.ts                    # JSON module declarations
 ├── style.css                        # Global styles
 └── main.ts                          # Application entry point
 ```
@@ -177,6 +216,12 @@ src/
 - **Dynamic Registration**: Containers register themselves on mount
 - **Initialization Tracking**: Ensures all containers ready before starting
 - **Position Synchronization**: Maintains consistent scroll positions
+
+#### Image Management
+- **External Data**: Images loaded from JSON configuration file
+- **Type Safety**: Full TypeScript support for image data
+- **Deterministic Shuffling**: Consistent variety across containers
+- **Complete Coverage**: All containers show all images in different orders
 
 #### Responsive Design
 - **Card Sizing**: Automatic adjustment based on layer count
