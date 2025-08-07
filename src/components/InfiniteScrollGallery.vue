@@ -1074,13 +1074,13 @@ onUnmounted(() => {
             v-model.number="layerSpacing"
             type="range"
             min="0"
-            max="20"
+            max="40"
             step="0.1"
             class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
           <div class="flex justify-between text-xs text-gray-400 mt-0.5">
             <span>0</span>
-            <span>20</span>
+            <span>40</span>
           </div>
         </div>
 
