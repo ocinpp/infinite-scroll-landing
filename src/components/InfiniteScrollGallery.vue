@@ -16,10 +16,8 @@ export interface GalleryConfig {
   images: ImageItem[];
   /** Scroll orientation - horizontal or vertical */
   scrollDirection?: "horizontal" | "vertical";
-  /** Tilt angle in degrees (0-45) */
+  /** Tilt angle in degrees (-45 to 45, negative = left, positive = right) */
   tiltDegree?: number;
-  /** Tilt direction - left or right */
-  tiltDirection?: "left" | "right";
   /** Enable autoplay */
   autoplay?: boolean;
   /** Autoplay direction - forward or reverse */
@@ -65,8 +63,7 @@ const allImages = computed(() => props.config.images);
 // Default configuration values (excluding images which is required)
 const defaultSettings = {
   scrollDirection: "horizontal" as const,
-  tiltDegree: 15,
-  tiltDirection: "right" as const,
+  tiltDegree: 15, // Positive = right tilt, negative = left tilt
   autoplay: true,
   autoplayDirection: "forward" as const,
   pauseOnHover: true,
@@ -83,7 +80,6 @@ const finalConfig = computed(() => ({
 
 // Reactive state initialized with config values
 const tiltDegree = ref(finalConfig.value.tiltDegree);
-const tiltDirection = ref<"left" | "right">(finalConfig.value.tiltDirection);
 const autoplay = ref(finalConfig.value.autoplay);
 const autoplayDirection = ref<"forward" | "reverse">(
   finalConfig.value.autoplayDirection
@@ -150,12 +146,8 @@ const debugSystemState = () => {
 
 // Computed properties
 const containerTiltStyle = computed(() => {
-  const degree =
-    tiltDirection.value === "left"
-      ? -Math.abs(tiltDegree.value)
-      : Math.abs(tiltDegree.value);
   return {
-    transform: `rotate(${degree}deg)`,
+    transform: `rotate(${tiltDegree.value}deg)`,
     transformOrigin: "center center",
   };
 });
@@ -964,8 +956,8 @@ watch(isPaused, (newValue, oldValue) => {
 });
 
 // Watch for tilt changes - simplified
-watch([tiltDegree, tiltDirection], () => {
-  console.log(`🔄 Tilt changed: ${tiltDegree.value}° ${tiltDirection.value}`);
+watch(tiltDegree, () => {
+  console.log(`🔄 Tilt changed: ${tiltDegree.value}°`);
   // Tilt changes don't need to reset the scroll system, just update styles
 });
 
@@ -1148,7 +1140,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Tilt Degree -->
+        <!-- Tilt Angle -->
         <div>
           <label class="block text-xs text-gray-300 mb-1"
             >Tilt Angle: {{ tiltDegree }}°</label
@@ -1156,26 +1148,14 @@ onUnmounted(() => {
           <input
             v-model.number="tiltDegree"
             type="range"
-            min="0"
+            min="-45"
             max="45"
             class="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
           />
           <div class="flex justify-between text-xs text-gray-400 mt-0.5">
-            <span>0°</span>
-            <span>45°</span>
+            <span>-45° (Left)</span>
+            <span>45° (Right)</span>
           </div>
-        </div>
-
-        <!-- Tilt Direction -->
-        <div>
-          <label class="block text-xs text-gray-300 mb-1">Tilt Direction</label>
-          <select
-            v-model="tiltDirection"
-            class="w-full p-1.5 bg-gray-700 text-white rounded border border-gray-600 text-xs"
-          >
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
         </div>
 
         <!-- Autoplay -->

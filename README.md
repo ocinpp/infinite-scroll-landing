@@ -97,8 +97,7 @@ The gallery automatically initializes with default settings:
 - **Speed**: Adjust animation speed (5-100)
 - **Layers**: Change number of scrolling layers (1-5)
 - **Spacing**: Adjust spacing between layers (0-20rem)
-- **Tilt Angle**: Adjust container tilt (0-45°)
-- **Tilt Direction**: Switch tilt between left and right
+- **Tilt Angle**: Adjust container tilt (-45° to 45°, negative = left, positive = right)
 - **Pause on Hover**: Enable/disable hover pause functionality
 
 ### Scroll Orientations
@@ -212,10 +211,8 @@ interface GalleryConfig {
   images: ImageItem[];
   /** Scroll orientation - horizontal or vertical */
   scrollDirection?: "horizontal" | "vertical";
-  /** Tilt angle in degrees (0-45) */
+  /** Tilt angle in degrees (-45 to 45, negative = left, positive = right) */
   tiltDegree?: number;
-  /** Tilt direction - left or right */
-  tiltDirection?: "left" | "right";
   /** Enable autoplay */
   autoplay?: boolean;
   /** Autoplay direction - forward or reverse */
@@ -356,8 +353,7 @@ const pauseOnHover = ref(true);           // Pause on mouse hover
 const scrollSpeed = ref(20);              // Animation speed (1-50)
 const numberOfContainers = ref(3);        // Number of layers (1-5)
 const layerSpacing = ref(14);             // Spacing between layers (0-20rem)
-const tiltDegree = ref(15);               // Tilt angle (0-45°)
-const tiltDirection = ref("right");       // Tilt direction (left/right)
+const tiltDegree = ref(15);               // Tilt angle (-45° to 45°, negative = left, positive = right)
 ```
 
 ### Customization
