@@ -3,6 +3,28 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import ImageModal from "./ImageModal.vue";
 import type { ImageItem } from "../types/images";
 
+// Configuration interface for default settings
+export interface GalleryConfig {
+  /** Scroll orientation - horizontal or vertical */
+  scrollDirection?: "horizontal" | "vertical";
+  /** Tilt angle in degrees (0-45) */
+  tiltDegree?: number;
+  /** Tilt direction - left or right */
+  tiltDirection?: "left" | "right";
+  /** Enable autoplay */
+  autoplay?: boolean;
+  /** Autoplay direction - forward or reverse */
+  autoplayDirection?: "forward" | "reverse";
+  /** Pause animation on hover */
+  pauseOnHover?: boolean;
+  /** Animation speed (1-50) */
+  scrollSpeed?: number;
+  /** Number of scroll layers (1-5) */
+  numberOfContainers?: number;
+  /** Spacing between layers in rem (0-40) */
+  layerSpacing?: number;
+}
+
 // Props
 interface Props {
   /**
@@ -14,23 +36,60 @@ interface Props {
    * ]
    */
   images: ImageItem[];
+
+  /**
+   * Configuration object for default gallery settings
+   * @example
+   * const config = {
+   *   scrollDirection: 'vertical',
+   *   autoplay: false,
+   *   numberOfContainers: 5,
+   *   scrollSpeed: 30
+   * }
+   */
+  config?: GalleryConfig;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  config: () => ({}),
+});
 
 // Use images from props
 const allImages = computed(() => props.images);
 
-// Reactive state
-const tiltDegree = ref(15);
-const tiltDirection = ref<"left" | "right">("right");
-const autoplay = ref(true);
-const autoplayDirection = ref<"forward" | "reverse">("forward");
-const pauseOnHover = ref(true);
-const scrollSpeed = ref(20);
-const numberOfContainers = ref(3);
-const layerSpacing = ref(14); // NEW: Spacing between layers in rem
-const scrollDirection = ref<"horizontal" | "vertical">("horizontal"); // NEW: Scroll direction
+// Default configuration values
+const defaultConfig: Required<GalleryConfig> = {
+  scrollDirection: "horizontal",
+  tiltDegree: 15,
+  tiltDirection: "right",
+  autoplay: true,
+  autoplayDirection: "forward",
+  pauseOnHover: true,
+  scrollSpeed: 20,
+  numberOfContainers: 3,
+  layerSpacing: 14,
+};
+
+// Merge props config with defaults
+const finalConfig = computed(() => ({
+  ...defaultConfig,
+  ...props.config,
+}));
+
+// Reactive state initialized with config values
+const tiltDegree = ref(finalConfig.value.tiltDegree);
+const tiltDirection = ref<"left" | "right">(finalConfig.value.tiltDirection);
+const autoplay = ref(finalConfig.value.autoplay);
+const autoplayDirection = ref<"forward" | "reverse">(
+  finalConfig.value.autoplayDirection
+);
+const pauseOnHover = ref(finalConfig.value.pauseOnHover);
+const scrollSpeed = ref(finalConfig.value.scrollSpeed);
+const numberOfContainers = ref(finalConfig.value.numberOfContainers);
+const layerSpacing = ref(finalConfig.value.layerSpacing);
+const scrollDirection = ref<"horizontal" | "vertical">(
+  finalConfig.value.scrollDirection
+);
 const selectedImage = ref<ImageItem | null>(null);
 const isModalOpen = ref(false);
 const isPaused = ref(false);

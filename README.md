@@ -145,15 +145,19 @@ When autoplay is disabled:
 ## 🖼️ Image Management
 
 ### Component Usage
-The `InfiniteScrollGallery` component accepts images as a prop for maximum flexibility:
+The `InfiniteScrollGallery` component accepts images and optional configuration as props:
 
 ```vue
 <template>
+  <!-- Basic usage with default settings -->
   <InfiniteScrollGallery :images="myImages" />
+
+  <!-- Advanced usage with custom configuration -->
+  <InfiniteScrollGallery :images="myImages" :config="customConfig" />
 </template>
 
 <script setup lang="ts">
-import InfiniteScrollGallery from './components/InfiniteScrollGallery.vue'
+import InfiniteScrollGallery, { type GalleryConfig } from './components/InfiniteScrollGallery.vue'
 import type { ImageItem } from './types/images'
 
 // Images can come from any source
@@ -167,6 +171,16 @@ const myImages: ImageItem[] = [
   // ... more images
 ]
 
+// Optional: Customize default settings
+const customConfig: GalleryConfig = {
+  scrollDirection: 'vertical',
+  autoplay: false,
+  numberOfContainers: 5,
+  scrollSpeed: 30,
+  tiltDegree: 25,
+  layerSpacing: 20
+}
+
 // Or from an API
 const apiImages = await fetch('/api/images').then(r => r.json())
 
@@ -174,8 +188,46 @@ const apiImages = await fetch('/api/images').then(r => r.json())
 const galleryImages = computed(() =>
   showNature.value ? natureImages : cityImages
 )
+
+// Dynamic configuration
+const dynamicConfig = computed(() => ({
+  scrollDirection: isMobile.value ? 'vertical' : 'horizontal',
+  numberOfContainers: screenSize.value === 'large' ? 5 : 3
+}))
 </script>
 ```
+
+### Configuration Options
+All control settings can be customized via the `config` prop:
+
+```typescript
+interface GalleryConfig {
+  /** Scroll orientation - horizontal or vertical */
+  scrollDirection?: "horizontal" | "vertical";
+  /** Tilt angle in degrees (0-45) */
+  tiltDegree?: number;
+  /** Tilt direction - left or right */
+  tiltDirection?: "left" | "right";
+  /** Enable autoplay */
+  autoplay?: boolean;
+  /** Autoplay direction - forward or reverse */
+  autoplayDirection?: "forward" | "reverse";
+  /** Pause animation on hover */
+  pauseOnHover?: boolean;
+  /** Animation speed (1-50) */
+  scrollSpeed?: number;
+  /** Number of scroll layers (1-5) */
+  numberOfContainers?: number;
+  /** Spacing between layers in rem (0-40) */
+  layerSpacing?: number;
+}
+```
+
+**Benefits:**
+- **Flexible defaults**: Set different defaults for different use cases
+- **Type safety**: Full TypeScript support with autocomplete
+- **Partial configuration**: Only specify the settings you want to change
+- **Dynamic configuration**: Use computed properties for responsive settings
 
 ### Image Data Structure
 Images are stored in `src/data/images.json` for easy maintenance:
