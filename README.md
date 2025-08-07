@@ -145,15 +145,15 @@ When autoplay is disabled:
 ## 🖼️ Image Management
 
 ### Component Usage
-The `InfiniteScrollGallery` component accepts images and optional configuration as props:
+The `InfiniteScrollGallery` component accepts a single configuration object that includes images and all settings:
 
 ```vue
 <template>
   <!-- Basic usage with default settings -->
-  <InfiniteScrollGallery :images="myImages" />
+  <InfiniteScrollGallery :config="basicConfig" />
 
   <!-- Advanced usage with custom configuration -->
-  <InfiniteScrollGallery :images="myImages" :config="customConfig" />
+  <InfiniteScrollGallery :config="customConfig" />
 </template>
 
 <script setup lang="ts">
@@ -171,8 +171,14 @@ const myImages: ImageItem[] = [
   // ... more images
 ]
 
-// Optional: Customize default settings
+// Basic configuration with just images (uses default settings)
+const basicConfig: GalleryConfig = {
+  images: myImages
+}
+
+// Advanced configuration with custom settings
 const customConfig: GalleryConfig = {
+  images: myImages,
   scrollDirection: 'vertical',
   autoplay: false,
   numberOfContainers: 5,
@@ -183,14 +189,14 @@ const customConfig: GalleryConfig = {
 
 // Or from an API
 const apiImages = await fetch('/api/images').then(r => r.json())
-
-// Or conditionally
-const galleryImages = computed(() =>
-  showNature.value ? natureImages : cityImages
-)
+const apiConfig: GalleryConfig = {
+  images: apiImages,
+  scrollDirection: 'horizontal'
+}
 
 // Dynamic configuration
 const dynamicConfig = computed(() => ({
+  images: showNature.value ? natureImages : cityImages,
   scrollDirection: isMobile.value ? 'vertical' : 'horizontal',
   numberOfContainers: screenSize.value === 'large' ? 5 : 3
 }))
@@ -198,10 +204,12 @@ const dynamicConfig = computed(() => ({
 ```
 
 ### Configuration Options
-All control settings can be customized via the `config` prop:
+All settings including images are configured via a single `config` prop:
 
 ```typescript
 interface GalleryConfig {
+  /** Array of images to display (required, non-empty) */
+  images: ImageItem[];
   /** Scroll orientation - horizontal or vertical */
   scrollDirection?: "horizontal" | "vertical";
   /** Tilt angle in degrees (0-45) */
@@ -223,10 +231,12 @@ interface GalleryConfig {
 }
 ```
 
-**Benefits:**
-- **Flexible defaults**: Set different defaults for different use cases
+**Key Features:**
+- **Centralized configuration**: Images and settings in one object
+- **Required images**: Images array is mandatory and cannot be empty
 - **Type safety**: Full TypeScript support with autocomplete
-- **Partial configuration**: Only specify the settings you want to change
+- **Flexible defaults**: Only specify the settings you want to change
+- **Runtime validation**: Throws error if images array is empty
 - **Dynamic configuration**: Use computed properties for responsive settings
 
 ### Image Data Structure

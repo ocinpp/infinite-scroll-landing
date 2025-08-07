@@ -3,8 +3,17 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import ImageModal from "./ImageModal.vue";
 import type { ImageItem } from "../types/images";
 
-// Configuration interface for default settings
+// Configuration interface for gallery settings
 export interface GalleryConfig {
+  /**
+   * Array of images to display in the infinite scroll gallery (required, non-empty)
+   * @example
+   * images: [
+   *   { id: 1, url: 'image1.jpg', title: 'Title', description: 'Description' },
+   *   { id: 2, url: 'image2.jpg', title: 'Title', description: 'Description' }
+   * ]
+   */
+  images: ImageItem[];
   /** Scroll orientation - horizontal or vertical */
   scrollDirection?: "horizontal" | "vertical";
   /** Tilt angle in degrees (0-45) */
@@ -28,42 +37,38 @@ export interface GalleryConfig {
 // Props
 interface Props {
   /**
-   * Array of images to display in the infinite scroll gallery
-   * @example
-   * const images = [
-   *   { id: 1, url: 'image1.jpg', title: 'Title', description: 'Description' },
-   *   { id: 2, url: 'image2.jpg', title: 'Title', description: 'Description' }
-   * ]
-   */
-  images: ImageItem[];
-
-  /**
-   * Configuration object for default gallery settings
+   * Configuration object for gallery settings including images and display options
    * @example
    * const config = {
+   *   images: [
+   *     { id: 1, url: 'image1.jpg', title: 'Title', description: 'Description' }
+   *   ],
    *   scrollDirection: 'vertical',
    *   autoplay: false,
    *   numberOfContainers: 5,
    *   scrollSpeed: 30
    * }
    */
-  config?: GalleryConfig;
+  config: GalleryConfig;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  config: () => ({}),
-});
+const props = defineProps<Props>();
 
-// Use images from props
-const allImages = computed(() => props.images);
+// Validate that images array is not empty
+if (!props.config.images || props.config.images.length === 0) {
+  throw new Error("GalleryConfig.images is required and cannot be empty");
+}
 
-// Default configuration values
-const defaultConfig: Required<GalleryConfig> = {
-  scrollDirection: "horizontal",
+// Use images from config
+const allImages = computed(() => props.config.images);
+
+// Default configuration values (excluding images which is required)
+const defaultSettings = {
+  scrollDirection: "horizontal" as const,
   tiltDegree: 15,
-  tiltDirection: "right",
+  tiltDirection: "right" as const,
   autoplay: true,
-  autoplayDirection: "forward",
+  autoplayDirection: "forward" as const,
   pauseOnHover: true,
   scrollSpeed: 20,
   numberOfContainers: 3,
@@ -72,7 +77,7 @@ const defaultConfig: Required<GalleryConfig> = {
 
 // Merge props config with defaults
 const finalConfig = computed(() => ({
-  ...defaultConfig,
+  ...defaultSettings,
   ...props.config,
 }));
 
